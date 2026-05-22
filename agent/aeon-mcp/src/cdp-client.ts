@@ -15,7 +15,7 @@ import WebSocket from "ws";
 import { cached } from "./cache.js";
 
 const CDP_HTTP = "http://localhost:9222";
-const WS_TIMEOUT = 5000;
+const WS_TIMEOUT = 30000;
 
 let nextId = 1;
 
