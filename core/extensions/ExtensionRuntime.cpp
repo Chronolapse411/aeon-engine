@@ -54,9 +54,12 @@
 
 static std::unordered_set<std::string> g_BlockDomains;   // ||domain^ rules
 static std::unordered_set<std::string> g_AllowDomains;   // @@||domain^ rules
+static std::vector<std::string>        g_PathPatterns;   // ||domain/path rules (substring match)
+static std::vector<std::string>        g_AllowPatterns;  // @@||domain/path whitelist patterns
 static std::vector<std::string>        g_CSSRules;       // ##.selector rules
 static std::mutex                      g_FilterMutex;
 static int                             g_TotalRulesLoaded = 0;
+static int                             g_RequestsBlocked  = 0;
 
 // Extract the domain/host from a URL (strips scheme + path)
 // e.g. "https://ads.doubleclick.net/pagead?id=123" → "ads.doubleclick.net"
@@ -94,10 +97,13 @@ void LoadFilterList(const char* path) {
             size_t end = line.find('^', start);
             if (end == std::string::npos) end = line.size();
             std::string domain = line.substr(start, end - start);
-            // Skip rules with path separators (complex rules not yet supported)
-            if (domain.find('/') != std::string::npos) continue;
             if (!domain.empty()) {
-                g_AllowDomains.insert(domain);
+                if (domain.find('/') != std::string::npos) {
+                    // Path-containing whitelist pattern — store for substring match
+                    g_AllowPatterns.push_back(domain);
+                } else {
+                    g_AllowDomains.insert(domain);
+                }
                 loaded++;
             }
             continue;
@@ -110,10 +116,13 @@ void LoadFilterList(const char* path) {
             if (end == std::string::npos) end = line.find('$', start);
             if (end == std::string::npos) end = line.size();
             std::string domain = line.substr(start, end - start);
-            // Skip complex rules with paths (v2 feature)
-            if (domain.find('/') != std::string::npos) continue;
             if (!domain.empty()) {
-                g_BlockDomains.insert(domain);
+                if (domain.find('/') != std::string::npos) {
+                    // Path-containing block pattern — store for substring match
+                    g_PathPatterns.push_back(domain);
+                } else {
+                    g_BlockDomains.insert(domain);
+                }
                 loaded++;
             }
             continue;
@@ -144,11 +153,13 @@ bool ShouldBlock(const char* url) {
 
     std::lock_guard<std::mutex> lock(g_FilterMutex);
 
+    // ── Phase 1: Domain-level checks (O(1) via unordered_set) ──
+
     // Check whitelist first (@@|| rules take priority)
     if (g_AllowDomains.count(host)) return false;
 
     // Check exact domain match
-    if (g_BlockDomains.count(host)) return true;
+    if (g_BlockDomains.count(host)) { g_RequestsBlocked++; return true; }
 
     // Check parent domain matches (e.g. block "ads.example.com" if
     // rule says "||example.com^" — subdomain matching)
@@ -158,7 +169,20 @@ bool ShouldBlock(const char* url) {
         if (dot == std::string::npos || dot == domain.size() - 1) break;
         domain = domain.substr(dot + 1);
         if (g_AllowDomains.count(domain)) return false;
-        if (g_BlockDomains.count(domain)) return true;
+        if (g_BlockDomains.count(domain)) { g_RequestsBlocked++; return true; }
+    }
+
+    // ── Phase 2: Path-pattern checks (linear scan — future: Aho-Corasick) ──
+    // These catch rules like ||doubleclick.net/pagead^ that include URL paths.
+
+    // Check path-pattern whitelist first
+    for (const auto& pat : g_AllowPatterns) {
+        if (strstr(url, pat.c_str())) return false;
+    }
+
+    // Check path-pattern block rules
+    for (const auto& pat : g_PathPatterns) {
+        if (strstr(url, pat.c_str())) { g_RequestsBlocked++; return true; }
     }
 
     return false;
@@ -166,8 +190,30 @@ bool ShouldBlock(const char* url) {
 
 void HideElements(HWND, const char* /*url*/) {
     // CSS element hiding injection — delegated to engine's InjectCSS
-    // The engine calls this after page load; we return combined CSS rules
-    // TODO: Wire to AeonEngine_InjectCSS_t via TabState callback
+    // The engine calls this after page load via GetCosmeticCSS()
+}
+
+// Return a combined CSS string for all element-hide rules.
+// Caller must free() the returned pointer (or use empty check).
+const char* GetCosmeticCSS() {
+    std::lock_guard<std::mutex> lock(g_FilterMutex);
+    if (g_CSSRules.empty()) return nullptr;
+
+    std::string css;
+    css.reserve(g_CSSRules.size() * 40); // avg selector ~40 chars
+    for (size_t i = 0; i < g_CSSRules.size(); i++) {
+        css += g_CSSRules[i];
+        // Batch selectors into groups of 50 for a single display:none rule
+        if ((i + 1) % 50 == 0 || i == g_CSSRules.size() - 1) {
+            css += "{display:none!important}";
+        } else {
+            css += ",";
+        }
+    }
+
+    char* out = static_cast<char*>(malloc(css.size() + 1));
+    if (out) memcpy(out, css.c_str(), css.size() + 1);
+    return out;
 }
 
 int GetBlockedCount() {
@@ -218,17 +264,30 @@ bool StoreCredential(const char* origin, const char* user, const char* pass) {
 namespace ExtensionRuntime {
 
 void Initialize(const SystemProfile& p) {
+    // ── CRITICAL: Load filter lists on ALL tiers ──────────────────
+    // NativeAdBlock provides baseline ad/tracker blocking even when
+    // users install uBlock Origin via the MV2 sandbox. Without this,
+    // modern tier users had zero ad blocking until they manually
+    // installed an extension — a terrible OOBE.
+    //
+    // BUG FIX (Session 32): Previously, filter list loading was
+    // gated behind `p.tier <= AeonTier::WinVista_7`, causing
+    // g_BlockDomains to be empty on Win10/11. The WebView2
+    // put_Response(403) path would fire but ShouldBlock() always
+    // returned false.
+    fprintf(stdout, "[ExtRuntime] Loading NativeAdBlock filter lists...\n");
+    NativeAdBlock::LoadFilterList("blocklists\\easylist.txt");
+    NativeAdBlock::LoadFilterList("blocklists\\easyprivacy.txt");
+    NativeAdBlock::LoadFilterList("blocklists\\delgadologic_extra.txt");
+    fprintf(stdout, "[ExtRuntime] NativeAdBlock ready: %d domain rules, %d total rules.\n",
+        NativeAdBlock::GetBlockedCount(), NativeAdBlock::GetTotalRules());
+
     bool usesNative = (p.tier <= AeonTier::WinVista_7);
 
     if (usesNative) {
         fprintf(stdout,
             "[ExtRuntime] Legacy tier — native modules mode. "
             "Extension sandbox disabled to save RAM.\n");
-
-        // Load built-in filter lists
-        NativeAdBlock::LoadFilterList("blocklists\\easylist.txt");
-        NativeAdBlock::LoadFilterList("blocklists\\easyprivacy.txt");
-        NativeAdBlock::LoadFilterList("blocklists\\delgadologic_extra.txt");
         return;
     }
 
@@ -236,8 +295,10 @@ void Initialize(const SystemProfile& p) {
     // IT NOTE: We deliberately support MV2 (not MV3) to maintain compatibility
     // with uBlock Origin and other powerful ad blockers. Chrome dropped MV2
     // in 2024 — this is our key differentiator over Chrome on Win10/11.
+    // NativeAdBlock runs as a FIRST-PASS filter underneath extensions.
     fprintf(stdout,
-        "[ExtRuntime] Modern tier — MV2 extension sandbox initialised.\n");
+        "[ExtRuntime] Modern tier — MV2 extension sandbox initialised. "
+        "NativeAdBlock active as baseline filter.\n");
     // TODO: SetupExtensionProcessHost(), LoadCRX3Manifests(), etc.
 }
 

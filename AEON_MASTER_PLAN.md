@@ -11,7 +11,7 @@
 # 🔒 CONFIDENTIAL
 ## Aeon Browser — Master Architecture, Strategy & Roadmap
 
-### DelgadoLogic · Internal Document · v8.2 · April 2026
+### DelgadoLogic · Internal Document · v8.8 · May 2026
 
 *Not for public distribution. Contains production infrastructure, credential references,*
 *proprietary AI strategy, and revenue projections.*
@@ -26,8 +26,8 @@
 |-------|-------|
 | **Classification** | `CONFIDENTIAL — INTERNAL USE ONLY` |
 | **Owner** | Manuel A. Delgado · DelgadoLogic |
-| **Last Updated** | April 21, 2026 |
-| **Version** | 8.2 — Build #8 Verified, All Pages Wired, Session Persistence |
+| **Last Updated** | May 22, 2026 |
+| **Version** | 8.9 — Wire AI Engines Complete, AI Browser Research, Session 34 |
 
 </div>
 
@@ -161,9 +161,14 @@ Running 24/7 on GCP, six autonomous agents patch, build, and train the browser:
 Users donate CPU cycles which significantly speeds up Cloud Build compiler operations. Updates are fetched BitTorrent-style using chunking, eliminating the need for a central paid CDN footprint. Security from Sybil attacks relies on Stake Locks, Reputation Scores, Proof-of-Work checks, and Sovereign Veto mechanisms from DelgadoLogic headquarters.
 
 ### 4.3 Agent/AI Integration
-CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud APIs.**
-- **AeonOmni** → Local execution (via phi-3-mini) for navigation logic/auto-completion.
-- **AeonAgent** → Direct Blink DOM injection; reads pages without screenshot-visual delays, injects automation seamlessly (e.g., flight booking).
+node-llama-cpp locally running GGUF models: **No OpenAI. No Azure. No Cloud APIs.**
+- **Brain**: Gemma 4 E4B Q4_K_M (4.75 GB) — 22-test sweep 100% pass rate, b8893 compiled from source.
+- **Embeddings**: BGE-small-en-v1.5 Q8 (35 MB) — semantic memory search.
+- **GPU**: Vulkan backend compiled (60 MB `ggml-vulkan.dll`, 120+ SPIR-V shaders) — auto-activates on ≥4 GB VRAM.
+- **CPU Path**: Smart fallback for integrated GPUs (~8-12 tok/s on Ryzen 7 5825U). CPU is faster than Vulkan on iGPUs.
+- **AeonOmni** → Local execution for navigation logic/auto-completion.
+- **AeonAgent** → Direct Blink DOM injection; reads pages without screenshot-visual delays, injects automation seamlessly.
+- See: [`internal_docs/inference_optimization.md`](internal_docs/inference_optimization.md) for benchmarks and engineering details.
 
 ---
 
@@ -280,16 +285,17 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
 - [x] ~~**Bridge injection**~~ — ✅ DONE (Session 19) — `AddScriptToExecuteOnDocumentCreated` for reliable `window.aeonBridge`.
 - [x] ~~**Feature Wiring**~~ — ✅ DONE (Session 25) — All 5 internal pages bridge-wired (settings, history, bookmarks, downloads, passwords).
 - [x] ~~**Session Persistence**~~ — ✅ DONE (Session 25) — SessionManager with 30s autosave + crash recovery.
-- [ ] **Phase 3: LLM Task Planner** — Plan→Act→Observe→Validate loop for autonomous browsing (~3-5 days).
+- [x] ~~**Phase 3: LLM Task Planner**~~ — ✅ DONE (Session 31) — Qwen 2.5 3B inference verified, Plan→Act→Observe→Validate loop wired.
+- [x] ~~**Phase 4: Autonomous Loop E2E**~~ — ✅ DONE (Session 33) — E2E test script (`test-e2e-loop.mjs`) exercising Plan→Act→Observe→Validate loop across 3 scenarios.
 - [ ] **Sectigo OV Certificate** — Secure Windows CA signature eliminating SmartScreen blocking (~$200).
 
 ### This Month
-- [ ] **Content Blocker Production** — Fix `put_Response` + Aho-Corasick filter engine for EasyList parsing.
-- [ ] **Wire AI Engines** — Connect Tab Intelligence + Journey Analytics to WebView2 lifecycle.
+- [x] ~~**Content Blocker Production**~~ — ✅ DONE (Session 33) — P0 bug found: filter lists only loaded on legacy tier, modern Win10/11 had empty rules. Fixed `ExtensionRuntime.cpp` to load on ALL tiers. Added path-pattern matching + cosmetic CSS injection.
+- [x] ~~**Wire AI Engines**~~ — ✅ DONE (Session 34) — Connected TabIntelligence + JourneyAnalytics to all WebView2 lifecycle events. 4 engine callbacks wired in AeonMain.cpp, 6 direct UI paths covered in BrowserChrome.cpp, 3 new pipe commands (`ai.tab_groups`, `ai.journey`, `ai.predictions`) added to AeonAgentPipe.cpp.
 - [ ] **AeonHive Anchor Nodes** — *MANUAL ACTION REQUIRED:* Spin up Hetzner CX11 and execute `./setup.sh`.
 - [ ] **OmniLicense RSA-2048 Validation** — Production license verification (currently stubbed).
 - [ ] **Installer Ed25519 Verification** — Signature check for update packages (currently stubbed).
-- [ ] **Rotate PAT Tokens** — Rotate `Chronolapse411` PAT before expiration in June 2026.
+- [x] ~~**Rotate PAT Tokens**~~ — ✅ DONE (Session 33) — New PAT set, expires **Aug 20, 2026**. Old tokens purged from `.git-credentials`.
 
 ### Next Quarter
 - [ ] **Evolution Engine Activation** — Wire Cloud Scheduler to API, deploy CodeLlama for patch generation.
@@ -311,7 +317,28 @@ CTranslate2 locally running quantized limits: **No OpenAI. No Azure. No Cloud AP
              ├── ✅ All 5 internal pages bridge-wired (Session 25)
              ├── ✅ Session persistence + crash recovery (Session 25)
              ├── ✅ Build #8 verified — Aeon.exe 1.78MB, all tests passed (Session 25)
-             ├── 🟡 Phase 3: LLM Task Planner (next step)
+             ├── ✅ Embedded LLM inference — node-llama-cpp, GGUF, zero cloud dependency (Session 26)
+             ├── ✅ RSI Engine hardened — Zod schemas, 7 brain files, routing matrix, 40 tools (Session 29)
+             ├── ✅ GGUF models downloaded — Gemma 4 E4B (4.7 GB brain) + MiniLM (24 MB embeddings) (Session 30)
+             ├── ✅ 7-phase E2E test PASSED — CDP→Navigate→Extract→Snapshot→Store→Search→Stats (Session 30)
+             ├── ✅ Build #15 verified — Zero TS errors, 40 tools, dual-model architecture (Session 30)
+             ├── ✅ Model swap: Qwen 2.5 3B Instruct Q4_K_M (1.84 GB) — b8390 compatible, inference verified (Session 31)
+             ├── ✅ Embedding upgrade: BGE-small-en-v1.5 Q8 (35 MB) replacing MiniLM — superior retrieval (Session 31)
+             ├── ✅ Build #16 verified — 42 tools, semantic search active, Qwen inference "2+2=4" confirmed (Session 31)
+             ├── ✅ **GEMMA 4 E4B UNLOCKED** — Patched node-llama-cpp cmake (cxx_std_17 + llama-common link), compiled b8893 from source (Session 31)
+             ├── ✅ Gemma 4 inference verified — "Two plus two equals four." — gemma4 E4B Q4_K_M on local b8893 build (Session 31)
+             ├── ✅ 22-Test Capability Sweep: 100% true pass rate across 10 categories (Session 31)
+             ├── ✅ Streaming API + Task-Aware Token Budgets (quick=64→unlimited=4096) (Session 31)
+             ├── ✅ **VULKAN GPU BUILD COMPILED** — 60 MB ggml-vulkan.dll, 120+ SPIR-V shaders, minimal SDK from Khronos repos (Session 32)
+             ├── ✅ **Smart GPU Selection** — VRAM-aware auto-switching: Vulkan on ≥4 GB, CPU fallback on iGPUs (Session 32)
+             ├── ✅ CPU inference benchmarked — ~8-12 tok/s on Ryzen 7 5825U, both Qwen2.5-3B and Gemma 4 E4B (Session 32)
+             ├── ✅ Engineering doc: `internal_docs/inference_optimization.md` — hardware reality, benchmarks, optimization levers (Session 32)
+             ├── ✅ **CONTENT BLOCKER P0 FIXED** — Filter lists now load on ALL tiers (was legacy-only). Path-pattern matching + cosmetic CSS injection (Session 33)
+             ├── ✅ **Phase 4 E2E Test** — `test-e2e-loop.mjs`: 3-scenario autonomous loop test (navigate→extract→summarize) (Session 33)
+             ├── ✅ **12 Research Repos Cloned** — adblock-rust, browser-use, stagehand, ladybird, kompute, slang, mlc-llm, PowerInfer, fingerprint-suite, creepjs, CanvasBlocker, mcp-servers (Session 33)
+             ├── ✅ **AI Browser Market Research** — 14 AI browsers analyzed (Chrome, Edge, Brave, Opera, Arc/Dia, ChatGPT Atlas, BrowserOS), competitive positioning mapped (Session 34)
+             ├── ✅ **6 New Research Repos Analyzed** — browser-use, stagehand, opencrabs, agent-browser, mcp-servers, BrowserOS — patterns extracted (Session 34)
+             ├── ✅ **WIRE AI ENGINES** — TabIntelligence + JourneyAnalytics connected to ALL WebView2 lifecycle events. 3 new pipe commands: `ai.tab_groups`, `ai.journey`, `ai.predictions` (Session 34)
              ├── 🟡 Autonomous Evolution Engine (agents exist, scheduler pending)
              └── 🔴 Code signing: Sectigo OV cert (pending purchase)
 
@@ -405,6 +432,6 @@ Anyone can fork Chromium. **Nobody has built this entire stack together:**
 
 *Unauthorized disclosure is prohibited.*
 
-`AEON_MASTER_PLAN_v8.0 · April 2026 · AeonMind Vision Edition`
+`AEON_MASTER_PLAN_v8.6 · April 2026 · Gemma 4 + Streaming + Token Budgets Edition`
 
 </div>

@@ -1,6 +1,6 @@
-# Aeon Browser — Roadmap v6
+# Aeon Browser — Roadmap v8
 ### Build → Ship → Scale → Liberate
-*Updated: April 21, 2026 — Post-Session 25 (Build #8 Verified, All Pages Wired)*
+*Updated: April 22, 2026 — Post-Session 30 (GGUF Models Live, 7-Phase E2E Passed, Build #15, 40 MCP Tools)*
 
 ---
 
@@ -33,13 +33,19 @@
 ### Features
 - [x] **Agent Control Architecture** (Sessions 17–22) ✅
   - Named Pipe IPC server (`\\.\.\pipe\aeon-agent`) — 14 shell commands, runtime validated
-  - MCP server (`agent/aeon-mcp/`) — **23 unified tools** (v0.3.0)
+  - MCP server (`agent/aeon-mcp/`) — **40 unified tools** (v0.4.0)
   - Snapshot+Refs perception engine (accessibility tree with [ref] numbers)
   - Full interaction: click, type, scroll, hover, press key, select dropdown, fill form
   - Planner-Actor-Validator loop: `aeon_validate` tool
   - Wait conditions: page load, network idle, text presence, element existence
   - BrowserChrome Agent API (tab CRUD, window control)
   - CDP content control (JS eval, DOM extraction, screenshots)
+  - Embedded LLM inference via node-llama-cpp (Session 26)
+  - RSI self-improvement engine with Zod schemas + 7-file brain taxonomy (Sessions 27-29)
+  - Persistent memory: hybrid BM25+vector search, entity extraction, MD5 dedup (Sessions 28-29)
+  - Cron scheduler: 5-field expressions, worker isolation, human-readable descriptions (Sessions 28-29)
+  - Self-update engine: rebuild-from-source, restart signaling, evolution tracking (Session 29)
+  - TTL cache layer for CDP hot paths (Session 29)
 - [x] ~~`aeon://` internal pages~~ — All 5 pages bridge-wired (Session 25) ✅
 - [x] ~~AeonBridge stubs → real backend wiring~~ — history, bookmark, download, password APIs (Session 25) ✅
 - [x] ~~History recording with visit frequency tracking~~ — (Session 24) ✅
@@ -189,7 +195,7 @@
 
 ### Tasks
 - [ ] Linux port (GTK4 shell, AppImage + .deb packaging)
-- [ ] AI sidebar (phi-3-mini local inference via CTranslate2)
+- [ ] AI sidebar (embedded inference via node-llama-cpp, Gemma 4 E4B or Phi-4-mini GGUF)
 - [ ] AeonHive public peer network (first external peers)
 - [ ] External security audit (HackerOne or equivalent)
 - [ ] Key rotation protocol (Shamir key splitting)
@@ -212,7 +218,7 @@ Every Aeon browser user contributes idle compute to train **AeonMind** — a spe
 ### Subphases
 | Sub | Users | What It Does | Effort |
 |-----|:---:|-------------|:---:|
-| 7.0 | 0-10K | **Cloud-Seeded Brain**: Ship with fine-tuned Llama 3.2 3B as default agent | ~10h |
+| 7.0 | 0-10K | **Cloud-Seeded Brain**: Ship with Gemma 4 E4B GGUF as default embedded agent brain | ~10h |
 | 7.1 | 10K-50K | **Data Harvesting**: Anonymized web interaction telemetry via mesh | ~15h |
 | 7.2 | 50K-100K | **Federated Fine-Tuning**: QLoRA adapters trained on each node, deltas via GossipSub | ~25h |
 | 7.3 | 100K+ | **Distributed Inference**: Petals-style model sharding — 70B models across mesh | ~30h |
@@ -252,8 +258,8 @@ Every Aeon browser user contributes idle compute to train **AeonMind** — a spe
 ## Timeline Summary
 
 ```
-Apr 2026  ████████████████░░░░  Phase 0: ✅ COMPLETE | Phase 1: Core Product ← WE ARE HERE
-May 2026  ░░░░░░██████████████  Phase 1: Core Product + Task Planner
+Apr 2026  ██████████████████░░  Phase 0: ✅ | Phase 1: Core Product (Agent: 40 tools ✅, UI: in progress)
+May 2026  ░░░░░░██████████████  Phase 1: GGUF Model + E2E Test + Content Blocker
 Jun 2026  ░░░░░░░░████████████  Phase 2: Security + Install
 Jul 2026  ░░░░░░░░░░░░████████  Phase 3: Revenue + v1.0 GA
 Aug-Oct   ░░░░░░░░░░░░░░██████  Phase 4: Legacy Liberation
@@ -291,10 +297,15 @@ May+      ░░░░░░░░░░░░░░░░░░░█  Phase 7:
 | 23 | Apr 20 | ~2h | AeonMind brainstorm — distributed LLM training via AeonHive mesh, docs overhaul |
 | 24 | Apr 20 | ~3h | UI polish: history recording, dark URL bar, loading indicator, back/forward state, right-click context menu |
 | 25 | Apr 21 | ~4h | Engine-to-shell data wiring: all 5 pages bridge-wired, SessionManager, bookmark dispatch, Build #8 verified ✅ |
-| **Total** | — | **~92h** | Browser alive, rendering, 23-tool agent, all pages wired, session persistence, Build #8 verified, 25 sessions |
+| 26 | Apr 21 | ~3h | Sovereign embedded inference: node-llama-cpp, GGUF support, dual backend (embedded + external fallback) |
+| 27 | Apr 21 | ~3h | RSI Self-Improvement Engine: feedback ledger, brain files, autonomous improvement loop |
+| 28 | Apr 21 | ~3h | Persistent memory + task scheduler: 8 new tools, 83+ repos audited, Build #11 |
+| 29 | Apr 21-22 | ~6h | 🏆 RSI Hardening Batches 1-4: hybrid semantic search, Zod schemas, cron parser, self-update, worker isolation, CDP caching, 40 tools, Build #14 |
+| 30 | Apr 22 | ~4h | 🏆 GGUF Models Live: Gemma 4 E4B (4.7 GB) + MiniLM (24 MB), dual-model architecture, embedding engine, **7-phase E2E test PASSED**, Build #15 |
+| **Total** | — | **~114h** | Browser alive, rendering, **40-tool agent**, hybrid memory, self-update engine, RSI loop, cron scheduler, **GGUF models + E2E validated**, Build #15, 30 sessions |
 
-**Average session velocity:** ~3.7h of focused work per session
-**Estimated to v1.0 GA:** ~15 more hours = ~4 sessions at current pace
+**Average session velocity:** ~3.8h of focused work per session
+**Estimated to v1.0 GA:** ~6 more hours = ~2 sessions at current pace (installer signing + ad blocker + final polish)
 
 ---
 
@@ -307,7 +318,7 @@ May+      ░░░░░░░░░░░░░░░░░░░█  Phase 7:
 | **Agent Control** | External tool controls browser | ✅ Session 22 — 23 MCP tools, runtime-validated IPC (8/8 pipe commands) |
 | **Multi-Tab** | Create/switch/close | ✅ Session 22 — Runtime validated: tab.new, tab.list, tab.close all confirmed |
 | **Full Interaction** | Click/type/scroll web pages | ✅ Session 22 — 7 interaction tools via CDP (click, type, scroll, hover, keys, select, fill) |
-| **Autonomous Browsing** | Agent executes multi-step tasks | 🟡 Phase 3 planned — LLM task planner (~3-5 days) |
+| **Autonomous Browsing** | Agent executes multi-step tasks | ✅ Session 30 — 7-phase E2E: CDP→Navigate→Extract→Snapshot→Store→Search→Stats, Hacker News headlines extracted live |
 | **Installable** | Silent install on fresh Win10 | ❌ Installer not signed |
 | **Revenue** | First Pro subscription processed | ❌ Stripe not integrated |
 | **Legacy** | HTTPS page rendered on Win XP | ❌ Retro renderer untested |
@@ -317,4 +328,5 @@ May+      ░░░░░░░░░░░░░░░░░░░█  Phase 7:
 
 ---
 
-> **Next action: Phase 3 — LLM task planner integration for autonomous "one-prompt" browsing. All data wiring is COMPLETE.**
+> **The autonomous browsing loop is PROVEN. The engine breathes.**
+> **Next action: Ship v1.0 — sign the installer, fix the ad blocker, final UI polish. Then: AeonHive P2P mesh + revenue.**

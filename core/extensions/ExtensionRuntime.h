@@ -15,6 +15,7 @@ namespace NativeAdBlock {
     void LoadFilterList(const char* path);
     bool ShouldBlock(const char* url);
     void HideElements(HWND hwnd, const char* url);
+    const char* GetCosmeticCSS();    // Returns malloc'd CSS string for element-hide rules (caller must free)
     int  GetBlockedCount();   // Number of domain-block rules loaded
     int  GetTotalRules();     // Total rules across all filter lists
 }

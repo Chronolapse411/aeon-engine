@@ -17,6 +17,12 @@
 #include "AeonAgentPipe.h"
 #include "../ui/BrowserChrome.h"
 #include "../AeonVersion.h"
+#include "../../ai/aeon_tab_intelligence.h"
+#include "../../ai/aeon_journey_analytics.h"
+
+extern AeonTabIntelligence* g_TabIntel;
+extern AeonJourneyAnalytics* g_JourneyAI;
+
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -202,6 +208,95 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
     }
     else if (cmd == "ping") {
         data->response = "{\"ok\":true,\"pong\":true}\n";
+    }
+    // ── AI Engine Queries ────────────────────────────────────────────
+    else if (cmd == "ai.tab_groups") {
+        if (!g_TabIntel) {
+            data->response = "{\"ok\":false,\"error\":\"TabIntelligence not initialized\"}\n";
+        } else {
+            auto groups = g_TabIntel->GetGroups();
+            std::string json = "{\"ok\":true,\"groups\":[";
+            for (size_t i = 0; i < groups.size(); i++) {
+                if (i > 0) json += ",";
+                char buf[1024];
+                _snprintf_s(buf, sizeof(buf), _TRUNCATE,
+                    "{\"id\":%d,\"name\":\"%s\",\"color\":%u,\"tab_count\":%u,"
+                    "\"total_memory\":%llu,\"avg_relevance\":%.2f,"
+                    "\"topic\":\"%s\",\"is_journey\":%s,"
+                    "\"journey_stage\":\"%s\",\"journey_progress\":%.2f}",
+                    groups[i].group_id,
+                    JsonEscape(groups[i].name).c_str(),
+                    groups[i].color, groups[i].tab_count,
+                    (unsigned long long)groups[i].total_memory,
+                    groups[i].avg_relevance,
+                    JsonEscape(groups[i].primary_topic).c_str(),
+                    groups[i].is_journey ? "true" : "false",
+                    JsonEscape(groups[i].journey_stage).c_str(),
+                    groups[i].journey_progress);
+                json += buf;
+            }
+            json += "]}\n";
+            data->response = json;
+        }
+    }
+    else if (cmd == "ai.journey") {
+        if (!g_JourneyAI) {
+            data->response = "{\"ok\":false,\"error\":\"JourneyAnalytics not initialized\"}\n";
+        } else {
+            auto journeys = g_JourneyAI->GetActiveJourneys();
+            std::string json = "{\"ok\":true,\"journeys\":[";
+            for (size_t i = 0; i < journeys.size(); i++) {
+                if (i > 0) json += ",";
+                char buf[1024];
+                _snprintf_s(buf, sizeof(buf), _TRUNCATE,
+                    "{\"id\":%llu,\"title\":\"%s\",\"intent\":%u,"
+                    "\"final_stage\":%u,\"start_utc\":%llu,\"end_utc\":%llu,"
+                    "\"total_pages\":%u,\"unique_domains\":%u,"
+                    "\"total_time_secs\":%u,\"completion\":%.2f,"
+                    "\"linearity\":%.2f,\"satisfaction\":%.2f}",
+                    (unsigned long long)journeys[i].journey_id,
+                    JsonEscape(journeys[i].title).c_str(),
+                    (unsigned)journeys[i].intent,
+                    (unsigned)journeys[i].final_stage,
+                    (unsigned long long)journeys[i].start_utc,
+                    (unsigned long long)journeys[i].end_utc,
+                    journeys[i].total_pages,
+                    journeys[i].unique_domains,
+                    journeys[i].total_time_secs,
+                    journeys[i].completion,
+                    journeys[i].linearity,
+                    journeys[i].satisfaction);
+                json += buf;
+            }
+            json += "]}\n";
+            data->response = json;
+        }
+    }
+    else if (cmd == "ai.predictions") {
+        if (!g_TabIntel) {
+            data->response = "{\"ok\":false,\"error\":\"TabIntelligence not initialized\"}\n";
+        } else {
+            auto preds = g_TabIntel->GetPredictions();
+            std::string json = "{\"ok\":true,\"predictions\":[";
+            for (size_t i = 0; i < preds.size(); i++) {
+                if (i > 0) json += ",";
+                char buf[4096];
+                _snprintf_s(buf, sizeof(buf), _TRUNCATE,
+                    "{\"url\":\"%s\",\"title\":\"%s\","
+                    "\"confidence\":%.2f,\"reason\":\"%s\","
+                    "\"historical_opens\":%u,\"avg_hour\":%u,\"avg_day\":%u}",
+                    JsonEscape(preds[i].url).c_str(),
+                    JsonEscape(preds[i].title).c_str(),
+                    preds[i].confidence,
+                    JsonEscape(preds[i].reason).c_str(),
+                    preds[i].historical_opens,
+                    preds[i].avg_hour,
+                    preds[i].avg_day_of_week);
+                json += buf;
+            }
+            json += "]}\n";
+            data->response = json;
+        }
     }
     else {
         char buf[256];

@@ -56,8 +56,8 @@ static AeonEngineVTable* g_Engine = nullptr;
 static HWND g_MainHwnd = nullptr;
 
 // Global AI engine pointers — initialized during boot, non-owning refs
-static AeonTabIntelligence* g_TabIntel = nullptr;
-static AeonJourneyAnalytics* g_JourneyAI = nullptr;
+AeonTabIntelligence* g_TabIntel = nullptr;
+AeonJourneyAnalytics* g_JourneyAI = nullptr;
 
 // Declared in TierDispatcher.cpp — loads the engine DLL chain
 AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile);
@@ -222,6 +222,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
                     HistoryEngine::RecordVisit(tabUrl, title);
                 }
             }
+
+            // AI: Feed title change to TabIntelligence
+            if (g_TabIntel && title && title[0]) {
+                char tabUrl[2048] = {};
+                if (g_Engine) g_Engine->GetUrl(tab_id, tabUrl, sizeof(tabUrl));
+                g_TabIntel->OnTabNavigated((uint64_t)tab_id, tabUrl, title);
+            }
         };
         cbs.OnNavigated = [](unsigned int tab_id, const char* url) {
             fprintf(stdout, "[Engine→Shell] Tab #%u navigated: %s\n",
@@ -236,11 +243,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
                 strncmp(url, "about:", 6) != 0) {
                 HistoryEngine::RecordVisit(url, nullptr);
             }
+
+            // AI: Feed navigation to TabIntelligence + JourneyAnalytics
+            if (g_TabIntel && url && url[0])
+                g_TabIntel->OnTabNavigated((uint64_t)tab_id, url, nullptr);
+            if (g_JourneyAI && url && url[0] &&
+                strncmp(url, "aeon://", 7) != 0 &&
+                strncmp(url, "about:", 6) != 0) {
+                g_JourneyAI->OnPageVisit((uint64_t)tab_id, url, nullptr,
+                                         /*from_search=*/false, /*from_link=*/true, /*from_back=*/false);
+            }
         };
         cbs.OnLoaded = [](unsigned int tab_id) {
             fprintf(stdout, "[Engine→Shell] Tab #%u loaded\n", tab_id);
             if (g_MainHwnd)
                 BrowserChrome::SetTabLoaded(g_MainHwnd, tab_id);
+
+            // AI: Notify JourneyAnalytics page finished loading (initial dwell = 0)
+            if (g_JourneyAI)
+                g_JourneyAI->OnPageDwell((uint64_t)tab_id, /*dwell_secs=*/0, /*engagement=*/0.0f);
         };
         cbs.OnCrash = [](unsigned int tab_id, const char* reason) {
             fprintf(stderr, "[Engine→Shell] CRASH: tab #%u — %s\n",
@@ -257,11 +278,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
         cbs.OnNewTab = [](unsigned int parent_id, const char* url) {
             fprintf(stdout, "[Engine→Shell] NewTab: parent #%u → %s\n",
                 parent_id, url ? url : "(null)");
+            unsigned int new_id = 0;
             if (g_MainHwnd)
-                BrowserChrome::CreateTab(g_MainHwnd, url);
+                new_id = BrowserChrome::CreateTab(g_MainHwnd, url);
+
+            // AI: Notify TabIntelligence of new tab creation
+            if (g_TabIntel && new_id) {
+                AeonTabInfo info = {};
+                info.tab_id = (uint64_t)new_id;
+                if (url) _snprintf_s(info.url, sizeof(info.url), _TRUNCATE, "%s", url);
+                _snprintf_s(info.title, sizeof(info.title), _TRUNCATE, "New Tab");
+                info.state = AeonTabState::Active;
+                g_TabIntel->OnTabCreated(info);
+            }
+            // AI: Feed new tab navigation to JourneyAnalytics
+            if (g_JourneyAI && new_id && url && url[0] &&
+                strncmp(url, "aeon://", 7) != 0) {
+                g_JourneyAI->OnPageVisit((uint64_t)new_id, url, nullptr,
+                                         /*from_search=*/false, /*from_link=*/false, /*from_back=*/false);
+            }
         };
         engine->SetCallbacks(&cbs);
-        fprintf(stdout, "[Boot] Engine callbacks wired (6 handlers).\n");
+        fprintf(stdout, "[Boot] Engine callbacks wired (6 handlers + AI intelligence).\n");
     }
 
     // 5. Tab Sleep Manager
@@ -591,6 +629,7 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             return 0;
 
         case WM_DESTROY:
+            BrowserChrome::Destroy(hWnd);
             PostQuitMessage(0);
             return 0;
     }

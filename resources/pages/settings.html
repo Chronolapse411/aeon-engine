@@ -518,6 +518,58 @@ document.querySelectorAll('nav a').forEach(a => {
     if (target) target.scrollIntoView({ behavior: 'smooth' });
   });
 });
+
+// ── Initialize controls from live C++ state ──────────────────────
+// window.__aeon.settings is injected by AeonBridge::BuildInjectionScript()
+// before this page loads. It contains the actual persisted settings.
+document.addEventListener('DOMContentLoaded', () => {
+  const s = window.__aeon?.settings;
+  if (!s) return;
+
+  // Helper: set toggle by setting key
+  function setToggle(key, checked) {
+    const el = document.querySelector(`[onchange*="'${key}'"]`);
+    if (el && el.type === 'checkbox') el.checked = !!checked;
+  }
+
+  // Helper: set select by setting key
+  function setSelect(key, value) {
+    const el = document.querySelector(`select[onchange*="'${key}'"]`);
+    if (el && value) el.value = value;
+  }
+
+  // Toggles
+  setToggle('adblock',          s.adblock);
+  setToggle('cookie_banners',   s.cookie_banners);
+  setToggle('fingerprint_guard',s.fingerprint_guard);
+  setToggle('gpc',              s.gpc);
+  setToggle('block_3p_cookies', s.block_3p_cookies);
+  setToggle('doh_enabled',      s.doh_enabled);
+  setToggle('tor_enabled',      s.tor_enabled);
+  setToggle('i2p_enabled',      s.i2p_enabled);
+  setToggle('bypass_enabled',   s.bypass_enabled);
+  setToggle('mixed_content',    s.mixed_content);
+  setToggle('safe_browsing',    s.safe_browsing);
+  setToggle('telemetry',        s.telemetry);
+  setToggle('dl_ask',           s.dl_ask);
+
+  // Selects
+  setSelect('startup_page',     s.startup_page);
+  setSelect('search_engine',    s.search_engine);
+  setSelect('doh_provider',     s.doh_provider);
+  setSelect('min_tls',          s.min_tls);
+
+  // Text inputs
+  const homepageEl = document.getElementById('homepage');
+  if (homepageEl && s.homepage) homepageEl.value = s.homepage;
+
+  const dlPathEl = document.getElementById('dl_path');
+  if (dlPathEl && s.dl_path) dlPathEl.value = s.dl_path;
+
+  // Number inputs (dl_streams)
+  const streamsEl = document.querySelector('input[type="number"][onchange*="dl_streams"]');
+  if (streamsEl && s.dl_streams) streamsEl.value = s.dl_streams;
+});
 </script>
 </body>
 </html>

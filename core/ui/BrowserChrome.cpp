@@ -52,6 +52,11 @@
 #include "../../core/network/NetworkSentinel.h"
 #include "../../core/network/DnsResolver.h"
 #include "../../core/engine/AeonBridge.h"
+#include "../../ai/aeon_tab_intelligence.h"
+#include "../../ai/aeon_journey_analytics.h"
+
+extern AeonTabIntelligence* g_TabIntel;
+extern AeonJourneyAnalytics* g_JourneyAI;
 
 #pragma comment(lib, "dwmapi.lib")
 
@@ -94,6 +99,8 @@ struct ChromeTab {
     std::string   title;
     bool          loading;
     RECT          tabRect;
+    std::vector<std::string> history;
+    int           historyIndex;
 };
 
 // ---------------------------------------------------------------------------
@@ -105,7 +112,16 @@ struct ChromeState {
     HWND                hwnd;
     HWND                hUrlBar;
     HWND                hContent;
-    HFONT               hUrlFont;  // URL bar font — stored to prevent GDI leak
+    
+    // Cached GDI fonts to prevent GDI leak
+    HFONT               hUrlFont;      // URL bar font
+    HFONT               hTextFont;     // 9pt Segoe UI Normal
+    HFONT               hTextBold;     // 9pt Segoe UI Bold
+    HFONT               hTextTabFont;  // 8pt Segoe UI Normal
+    HFONT               hIconFont;     // 10pt Segoe MDL2 Assets
+    HFONT               hIconFontSmall;// 8pt Segoe MDL2 Assets
+    HFONT               hIconFontLarge;// 11pt Segoe MDL2 Assets
+    HFONT               hLogoFont;     // 15pt Segoe UI Bold
 
     std::vector<ChromeTab> tabs;
     int                 activeTab;
@@ -118,6 +134,9 @@ struct ChromeState {
 
     bool                urlFocused;
     bool                settingsOpen;
+
+    // Dark-theme URL bar brushes (created once, reused for WM_CTLCOLOREDIT)
+    HBRUSH              hUrlBgBrush;   // #16182a
 };
 
 // ---------------------------------------------------------------------------
@@ -183,12 +202,8 @@ static void DrawRoundRect(HDC hdc, const RECT& r, int rx, COLORREF fill, COLORRE
 }
 
 static void DrawText16(HDC hdc, const char* text, const RECT& r,
-                       COLORREF c, int ptSize = 9, bool bold = false) {
-    int ptH = -MulDiv(ptSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-    HFONT f = CreateFontW(ptH, 0, 0, 0, bold ? FW_SEMIBOLD : FW_NORMAL,
-        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    HFONT old = (HFONT)SelectObject(hdc, f);
+                       COLORREF c, HFONT hFont) {
+    HFONT old = (HFONT)SelectObject(hdc, hFont);
     SetTextColor(hdc, c);
     SetBkMode(hdc, TRANSPARENT);
     // Convert UTF-8 to wide string for proper Unicode rendering
@@ -199,26 +214,20 @@ static void DrawText16(HDC hdc, const char* text, const RECT& r,
     DrawTextW(hdc, wBuf, -1, &dr,
         DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     SelectObject(hdc, old);
-    DeleteObject(f);
 }
 
 // ---------------------------------------------------------------------------
 // MDL2 icon helper — renders glyphs from "Segoe MDL2 Assets" (Win10+)
 // ---------------------------------------------------------------------------
 static void DrawIcon(HDC hdc, const wchar_t* glyph, const RECT& r,
-                     COLORREF c, int ptSize = 10) {
-    int ptH = -MulDiv(ptSize, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-    HFONT f = CreateFontW(ptH, 0, 0, 0, FW_NORMAL,
-        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
-    HFONT old = (HFONT)SelectObject(hdc, f);
+                     COLORREF c, HFONT hFont) {
+    HFONT old = (HFONT)SelectObject(hdc, hFont);
     SetTextColor(hdc, c);
     SetBkMode(hdc, TRANSPARENT);
     RECT dr = r;
     DrawTextW(hdc, glyph, -1, &dr,
         DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
     SelectObject(hdc, old);
-    DeleteObject(f);
 }
 
 // MDL2 glyph constants
@@ -239,7 +248,7 @@ static void DrawIcon(HDC hdc, const wchar_t* glyph, const RECT& r,
 // ---------------------------------------------------------------------------
 // Paint the "A" logo badge — the signature element from the mockup
 // ---------------------------------------------------------------------------
-static void DrawLogoBadge(HDC hdc, int x, int y) {
+static void DrawLogoBadge(HDC hdc, int x, int y, HFONT hLogoFont) {
     const int SIZE = 28;
     // Gradient approximation — 4 vertical bands from accent to accent2
     COLORREF gradColors[] = {
@@ -277,16 +286,11 @@ static void DrawLogoBadge(HDC hdc, int x, int y) {
 
     // "A" lettermark — bold, white, centered
     RECT textR = { x, y, x + SIZE, y + SIZE };
-    int ptH = -MulDiv(15, GetDeviceCaps(hdc, LOGPIXELSY), 72);
-    HFONT f = CreateFontA(ptH, 0, 0, 0, FW_BOLD, FALSE, 0, 0,
-        ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, "Segoe UI");
-    HFONT old = (HFONT)SelectObject(hdc, f);
+    HFONT old = (HFONT)SelectObject(hdc, hLogoFont);
     SetTextColor(hdc, RGB(255, 255, 255));
     SetBkMode(hdc, TRANSPARENT);
     DrawTextA(hdc, "A", -1, &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     SelectObject(hdc, old);
-    DeleteObject(f);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,22 +302,33 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     FillRectColor(hdc, navR, CLR_BG_PRIMARY);
 
     // "A" logo badge — top-left, vertically centered
-    DrawLogoBadge(hdc, BTN_LOGO_X, (NAV_HEIGHT - 28) / 2);
+    DrawLogoBadge(hdc, BTN_LOGO_X, (NAV_HEIGHT - 28) / 2, ch->hLogoFont);
+
+    // Determine back/forward availability from tab history stack
+    bool canGoBack = false, canGoForward = false;
+    if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+        const auto& t = ch->tabs[ch->activeTab];
+        canGoBack = (t.historyIndex > 0);
+        canGoForward = (t.historyIndex < (int)t.history.size() - 1);
+    }
 
     // Nav buttons: ← → ↻  (flat icons, no card borders — modern browser style)
-    struct { int x; const wchar_t* icon; } navBtns[] = {
-        { BTN_BACK_X, ICON_BACK },
-        { BTN_FWD_X,  ICON_FORWARD },
-        { BTN_REF_X,  ICON_REFRESH }
+    // Back and Forward dim to text-faint when unavailable
+    struct { int x; const wchar_t* icon; bool enabled; } navBtns[] = {
+        { BTN_BACK_X, ICON_BACK,    canGoBack },
+        { BTN_FWD_X,  ICON_FORWARD, canGoForward },
+        { BTN_REF_X,  ICON_REFRESH, true }
     };
-    for (auto& b : navBtns) {
+    for (int bi = 0; bi < 3; bi++) {
+        auto& b = navBtns[bi];
         RECT br = { b.x, 4, b.x + BTN_BACK_W, NAV_HEIGHT - 4 };
-        // Hover highlight (subtle bg card on hover)
-        bool isHover = (ch->hoverBtn == (&b - navBtns + 1));
-        if (isHover) {
+        bool isHover = (ch->hoverBtn == (bi + 1));
+        if (isHover && b.enabled) {
             DrawRoundRect(hdc, br, 6, CLR_BG_CARD, CLR_BG_CARD);
         }
-        DrawIcon(hdc, b.icon, br, isHover ? CLR_TEXT : CLR_TEXT_DIM, 10);
+        COLORREF iconColor = !b.enabled ? CLR_TEXT_FAINT :
+                             isHover ? CLR_TEXT : CLR_TEXT_DIM;
+        DrawIcon(hdc, b.icon, br, iconColor, ch->hIconFont);
     }
 
     // URL bar
@@ -325,7 +340,7 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
 
     // Lock icon — proper MDL2 lock glyph
     RECT lockR = { urlLeft + 6, 6, urlLeft + 24, NAV_HEIGHT - 6 };
-    DrawIcon(hdc, ICON_LOCK, lockR, CLR_GREEN, 8);
+    DrawIcon(hdc, ICON_LOCK, lockR, CLR_GREEN, ch->hIconFontSmall);
 
     // URL text
     const char* urlTxt = "about:blank";
@@ -335,7 +350,7 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
         urlTxt = t.url.c_str();
     }
     RECT urlTextR = { urlLeft + 26, 6, urlRight - 32, NAV_HEIGHT - 6 };
-    DrawText16(hdc, urlTxt, urlTextR, CLR_TEXT, 9);
+    DrawText16(hdc, urlTxt, urlTextR, CLR_TEXT, ch->hTextFont);
 
     // AdBlock shield — small green dot indicator
     HBRUSH shieldB = CreateSolidBrush(CLR_GREEN);
@@ -360,7 +375,7 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
             DrawRoundRect(hdc, ir, 6, CLR_BG_CARD, CLR_BG_CARD);
         }
         COLORREF ic = iconHover ? CLR_TEXT : iconColors[i];
-        DrawIcon(hdc, rightIcons[i], ir, ic, 11);
+        DrawIcon(hdc, rightIcons[i], ir, ic, ch->hIconFontLarge);
     }
 
     // Window control buttons: minimize, maximize/restore, close
@@ -372,20 +387,20 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     if (ch->hoverBtn == 10) {
         FillRectColor(hdc, minR, CLR_BG_CARD);
     }
-    DrawIcon(hdc, ICON_MINIMIZE, minR, ch->hoverBtn == 10 ? CLR_TEXT : CLR_TEXT_DIM, 10);
+    DrawIcon(hdc, ICON_MINIMIZE, minR, ch->hoverBtn == 10 ? CLR_TEXT : CLR_TEXT_DIM, ch->hIconFont);
     // Maximize hover
     if (ch->hoverBtn == 11) {
         FillRectColor(hdc, maxR, CLR_BG_CARD);
     }
     DrawIcon(hdc, IsZoomed(ch->hwnd) ? ICON_RESTORE : ICON_MAXIMIZE, maxR,
-             ch->hoverBtn == 11 ? CLR_TEXT : CLR_TEXT_DIM, 10);
+             ch->hoverBtn == 11 ? CLR_TEXT : CLR_TEXT_DIM, ch->hIconFont);
     // Close button — red background on hover
     bool closeHover = (ch->hoverBtn == 99);
     if (closeHover) {
         FillRectColor(hdc, clsR, RGB(196, 43, 28));
-        DrawIcon(hdc, ICON_CLOSE, clsR, RGB(255, 255, 255), 10);
+        DrawIcon(hdc, ICON_CLOSE, clsR, RGB(255, 255, 255), ch->hIconFont);
     } else {
-        DrawIcon(hdc, ICON_CLOSE, clsR, CLR_TEXT_DIM, 10);
+        DrawIcon(hdc, ICON_CLOSE, clsR, CLR_TEXT_DIM, ch->hIconFont);
     }
 }
 
@@ -427,22 +442,42 @@ static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
             FillRectColor(hdc, glow, CLR_ACCENT);
         }
 
-        // Tab favicon (small colored dot as placeholder until favicon system is live)
-        HBRUSH favB = CreateSolidBrush(active ? CLR_ACCENT2 : CLR_TEXT_FAINT);
-        RECT favR = { tR.left + 8, tR.top + 9, tR.left + 16, tR.top + 17 };
-        HRGN favRgn = CreateEllipticRgn(favR.left, favR.top, favR.right, favR.bottom);
-        FillRgn(hdc, favRgn, favB);
-        DeleteObject(favRgn);
-        DeleteObject(favB);
+        // Tab favicon or loading indicator
+        if (t.loading) {
+            // Loading: animated accent-colored spinner dot
+            // Use a simple pulsing dot effect — alternates size based on tick
+            DWORD tick = GetTickCount();
+            int phase = (tick / 200) % 4;  // 4-phase pulse
+            int dotSize = 6 + (phase % 2) * 2;  // oscillate 6-8px
+            int cx = tR.left + 12;
+            int cy = tR.top + 13;
+            HBRUSH spinB = CreateSolidBrush(CLR_ACCENT);
+            HRGN spinRgn = CreateEllipticRgn(
+                cx - dotSize/2, cy - dotSize/2,
+                cx + dotSize/2, cy + dotSize/2);
+            FillRgn(hdc, spinRgn, spinB);
+            DeleteObject(spinRgn);
+            DeleteObject(spinB);
+        } else {
+            // Favicon dot placeholder
+            HBRUSH favB = CreateSolidBrush(active ? CLR_ACCENT2 : CLR_TEXT_FAINT);
+            RECT favR = { tR.left + 8, tR.top + 9, tR.left + 16, tR.top + 17 };
+            HRGN favRgn = CreateEllipticRgn(favR.left, favR.top, favR.right, favR.bottom);
+            FillRgn(hdc, favRgn, favB);
+            DeleteObject(favRgn);
+            DeleteObject(favB);
+        }
 
         // Tab title
         RECT titleR = { tR.left + 20, tR.top, tR.right - 24, tR.bottom };
-        DrawText16(hdc, t.title.empty() ? "New Tab" : t.title.c_str(),
-            titleR, active ? CLR_TEXT : CLR_TEXT_DIM, 8);
+        const char* displayTitle = t.loading ? "Loading..." :
+                                   (t.title.empty() ? "New Tab" : t.title.c_str());
+        DrawText16(hdc, displayTitle,
+            titleR, active ? CLR_TEXT : CLR_TEXT_DIM, ch->hTextTabFont);
 
         // Close × (MDL2 icon) — more breathing room from title
         RECT closeR = { tR.right - 22, tR.top + 4, tR.right - 4, tR.bottom - 4 };
-        DrawIcon(hdc, ICON_CLOSE, closeR, CLR_TEXT_FAINT, 8);
+        DrawIcon(hdc, ICON_CLOSE, closeR, CLR_TEXT_FAINT, ch->hIconFontSmall);
 
         tabX += tabW + TAB_MARGIN;
     }
@@ -450,19 +485,19 @@ static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
     // New tab (+) button
     RECT addR = { tabX + 4, NAV_HEIGHT + 5, tabX + 28, NAV_HEIGHT + TAB_HEIGHT - 5 };
     DrawRoundRect(hdc, addR, 5, CLR_BG_CARD, CLR_TEXT_FAINT);
-    DrawIcon(hdc, ICON_ADD, addR, CLR_TEXT_DIM, 9);
+    DrawIcon(hdc, ICON_ADD, addR, CLR_TEXT_DIM, ch->hIconFont);
 }
 
 // ---------------------------------------------------------------------------
 // Full chrome paint
 // ---------------------------------------------------------------------------
-static void PaintChrome(ChromeState* ch) {
+static void PaintChrome(ChromeState* ch, HDC hdcOverride = nullptr) {
     RECT rc;
     GetClientRect(ch->hwnd, &rc);
     int W = rc.right;
 
     // Double-buffered paint
-    HDC hdc    = GetDC(ch->hwnd);
+    HDC hdc    = hdcOverride ? hdcOverride : GetDC(ch->hwnd);
     HDC memDC  = CreateCompatibleDC(hdc);
     HBITMAP bmp = CreateCompatibleBitmap(hdc, W, CHROME_H);
     HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
@@ -475,7 +510,10 @@ static void PaintChrome(ChromeState* ch) {
     SelectObject(memDC, old);
     DeleteObject(bmp);
     DeleteDC(memDC);
-    ReleaseDC(ch->hwnd, hdc);
+    
+    if (!hdcOverride) {
+        ReleaseDC(ch->hwnd, hdc);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -491,7 +529,38 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
     ch->hoverTab   = -1;
     ch->hoverBtn   = 0;
     ch->urlFocused = false;
+    ch->hUrlBgBrush = CreateSolidBrush(RGB(22, 24, 42)); // CLR_BG_CARD for URL bar
     ch->settings   = SettingsEngine::Load();
+
+    // Initialize all cached GDI font handles to prevent GDI leak
+    HDC hdcTemp = GetDC(parent);
+    int dpiY = GetDeviceCaps(hdcTemp, LOGPIXELSY);
+    ReleaseDC(parent, hdcTemp);
+
+    ch->hTextFont = CreateFontW(-MulDiv(9, dpiY, 72), 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    ch->hTextBold = CreateFontW(-MulDiv(9, dpiY, 72), 0, 0, 0, FW_SEMIBOLD,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    ch->hTextTabFont = CreateFontW(-MulDiv(8, dpiY, 72), 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    ch->hIconFont = CreateFontW(-MulDiv(10, dpiY, 72), 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
+    ch->hIconFontSmall = CreateFontW(-MulDiv(8, dpiY, 72), 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
+    ch->hIconFontLarge = CreateFontW(-MulDiv(11, dpiY, 72), 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
+    ch->hLogoFont = CreateFontW(-MulDiv(15, dpiY, 72), 0, 0, 0, FW_BOLD,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    ch->hUrlFont = CreateFontW(-14, 0, 0, 0, FW_NORMAL,
+        0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
     // Add a default new tab
     if (engine) {
@@ -500,6 +569,8 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
         t.url     = "aeon://newtab";
         t.title   = "New Tab";
         t.loading = false;
+        t.history.push_back(t.url);
+        t.historyIndex = 0;
         ch->tabs.push_back(t);
         ch->activeTab = 0;
 
@@ -521,7 +592,7 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
     SetWindowLongPtr(parent, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(ch));
 
     fprintf(stdout, "[Chrome] Browser chrome created. Logo badge: active. "
-        "Tab strip: %d tab(s).\n", (int)ch->tabs.size());
+         "Tab strip: %d tab(s).\n", (int)ch->tabs.size());
 
     // ── Background services on worker thread (non-blocking) ─────────────
     std::thread([]{
@@ -541,7 +612,12 @@ void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine)
 void OnPaint(HWND hwnd) {
     ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
-    if (ch) PaintChrome(ch);
+    if (ch) {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        PaintChrome(ch, hdc);
+        EndPaint(hwnd, &ps);
+    }
 }
 
 void OnSize(HWND hwnd, int w, int h) {
@@ -568,6 +644,10 @@ void OnSize(HWND hwnd, int w, int h) {
 // URL bar constants
 // ---------------------------------------------------------------------------
 #define IDC_URLBAR 9001
+
+// Loading animation timer — fires every 200ms to repaint the spinner
+#define ID_LOADING_TIMER 9002
+#define LOADING_TIMER_MS 200
 static WNDPROC g_OrigUrlBarProc = nullptr;
 
 // Sub-class proc for URL bar EDIT — intercepts Enter/Escape
@@ -604,19 +684,13 @@ static void ActivateUrlBar(ChromeState* ch, bool selectAll = true) {
     int urlRight = rc.right - URLBAR_END - 4;
 
     if (!ch->hUrlBar) {
-        ch->hUrlBar = CreateWindowExA(
-            0, "EDIT", "",
+        ch->hUrlBar = CreateWindowExW(
+            0, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             urlLeft, 8, urlRight - urlLeft, NAV_HEIGHT - 16,
             ch->hwnd, (HMENU)(UINT_PTR)IDC_URLBAR, nullptr, nullptr);
 
-        // Style the edit control — create font once, store in ChromeState
-        if (!ch->hUrlFont) {
-            ch->hUrlFont = CreateFontA(-14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
-                ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, "Segoe UI");
-        }
-        SendMessageA(ch->hUrlBar, WM_SETFONT, (WPARAM)ch->hUrlFont, TRUE);
+        SendMessageW(ch->hUrlBar, WM_SETFONT, (WPARAM)ch->hUrlFont, TRUE);
 
         // Subclass to intercept Enter/Escape
         g_OrigUrlBarProc = (WNDPROC)SetWindowLongPtr(
@@ -630,12 +704,17 @@ static void ActivateUrlBar(ChromeState* ch, bool selectAll = true) {
     const char* url = "about:blank";
     if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
         url = ch->tabs[ch->activeTab].url.c_str();
-    SetWindowTextA(ch->hUrlBar, url);
+
+    // Convert UTF-8 to UTF-16 wide string for EDIT control
+    int wLen = MultiByteToWideChar(CP_UTF8, 0, url, -1, nullptr, 0);
+    wchar_t* wBuf = (wchar_t*)_alloca(wLen * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, url, -1, wBuf, wLen);
+    SetWindowTextW(ch->hUrlBar, wBuf);
 
     ShowWindow(ch->hUrlBar, SW_SHOW);
     SetFocus(ch->hUrlBar);
     if (selectAll)
-        SendMessageA(ch->hUrlBar, EM_SETSEL, 0, -1);
+        SendMessageW(ch->hUrlBar, EM_SETSEL, 0, -1);
 
     ch->urlFocused = true;
     PaintChrome(ch);
@@ -644,16 +723,25 @@ static void ActivateUrlBar(ChromeState* ch, bool selectAll = true) {
 // Navigate to the URL currently in the edit control
 static void CommitUrlBar(ChromeState* ch) {
     if (!ch->hUrlBar) return;
-    char buf[2048] = {};
-    GetWindowTextA(ch->hUrlBar, buf, sizeof(buf));
+    wchar_t wbuf[2048] = {};
+    GetWindowTextW(ch->hUrlBar, wbuf, 2048);
 
     ShowWindow(ch->hUrlBar, SW_HIDE);
     SetFocus(ch->hwnd);
     ch->urlFocused = false;
 
-    if (buf[0] == '\0') return;
+    if (wbuf[0] == L'\0') return;
 
-    std::string url = buf;
+    // Convert wide to UTF-8
+    std::string url;
+    int u8Len = WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, nullptr, 0, nullptr, nullptr);
+    if (u8Len > 0) {
+        std::vector<char> u8Buf(u8Len);
+        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, u8Buf.data(), u8Len, nullptr, nullptr);
+        url = u8Buf.data();
+    }
+
+    if (url.empty()) return;
 
     // Auto-prepend https:// if no scheme present
     if (url.find("://") == std::string::npos && url.find("aeon://") != 0) {
@@ -661,13 +749,28 @@ static void CommitUrlBar(ChromeState* ch) {
         if (url.find('.') != std::string::npos || url.find("localhost") == 0) {
             url = "https://" + url;
         } else {
-            // Treat as search query (Bing — monetized via partner code)
+            // Treat as search query and encode spaces/ampersands
             std::string encoded;
             for (char c : url) {
                 if (c == ' ') encoded += '+';
+                else if (c == '&') encoded += "%26";
                 else encoded += c;
             }
-            url = "https://www.bing.com/search?q=" + encoded;
+            
+            std::string engine = ch->settings.search_engine;
+            for (auto& c : engine) c = (char)tolower(c);
+
+            if (engine == "google") {
+                url = "https://www.google.com/search?q=" + encoded;
+            } else if (engine == "bing") {
+                url = "https://www.bing.com/search?q=" + encoded;
+            } else if (engine == "brave") {
+                url = "https://search.brave.com/search?q=" + encoded;
+            } else if (engine == "ecosia") {
+                url = "https://www.ecosia.org/search?q=" + encoded;
+            } else { // Default to DuckDuckGo
+                url = "https://duckduckgo.com/?q=" + encoded;
+            }
         }
     }
 
@@ -677,6 +780,8 @@ static void CommitUrlBar(ChromeState* ch) {
         t.url = url;
         t.loading = true;
         if (ch->engine) ch->engine->Navigate(t.id, url.c_str(), nullptr);
+        // Start loading animation timer
+        SetTimer(ch->hwnd, ID_LOADING_TIMER, LOADING_TIMER_MS, nullptr);
     }
 
     PaintChrome(ch);
@@ -755,6 +860,8 @@ static void CreateNewTab(ChromeState* ch, const char* url = "aeon://newtab") {
     t.url = url;
     t.title = "New Tab";
     t.loading = false;
+    t.history.push_back(url);
+    t.historyIndex = 0;
     ch->tabs.push_back(t);
     ch->activeTab = (int)ch->tabs.size() - 1;
 
@@ -785,13 +892,21 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
 
     switch (hit) {
         case 1: // Back
-            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
-                ch->engine->GoBack(ch->tabs[ch->activeTab].id);
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+                auto& t = ch->tabs[ch->activeTab];
+                if (t.historyIndex > 0) {
+                    ch->engine->GoBack(t.id);
+                }
+            }
             break;
 
         case 2: // Forward
-            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
-                ch->engine->GoForward(ch->tabs[ch->activeTab].id);
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+                auto& t = ch->tabs[ch->activeTab];
+                if (t.historyIndex < (int)t.history.size() - 1) {
+                    ch->engine->GoForward(t.id);
+                }
+            }
             break;
 
         case 3: // Refresh
@@ -836,6 +951,9 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
                 // Close tab button
                 int idx = hit - 200;
                 if (idx >= 0 && idx < (int)ch->tabs.size()) {
+                    // AI: Notify TabIntelligence BEFORE destroying the tab
+                    if (g_TabIntel) g_TabIntel->OnTabClosed((uint64_t)ch->tabs[idx].id);
+
                     if (ch->engine) ch->engine->CloseTab(ch->tabs[idx].id);
                     ch->tabs.erase(ch->tabs.begin() + idx);
                     if (ch->tabs.empty()) {
@@ -853,12 +971,17 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
                 // Switch to tab
                 int idx = hit - 100;
                 if (idx >= 0 && idx < (int)ch->tabs.size() && idx != ch->activeTab) {
+                    unsigned int prevTabId = ch->tabs[ch->activeTab].id;
                     ch->activeTab = idx;
                     if (ch->engine) {
                         ch->engine->FocusTab(ch->tabs[idx].id);
                         ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 0, CHROME_H,
                             rc.right, rc.bottom - CHROME_H);
                     }
+                    // AI: Notify AI engines of tab focus change
+                    if (g_TabIntel) g_TabIntel->OnTabFocused((uint64_t)ch->tabs[idx].id);
+                    if (g_JourneyAI)
+                        g_JourneyAI->OnTabSwitch((uint64_t)prevTabId, (uint64_t)ch->tabs[idx].id);
                     PaintChrome(ch);
                 }
             }
@@ -945,6 +1068,9 @@ bool OnKeyDown(HWND hwnd, WPARAM vk, LPARAM lParam) {
     // --- Ctrl+W: Close current tab ---
     if (ctrl && !shift && !alt && vk == 'W') {
         if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+            // AI: Notify TabIntelligence BEFORE destroying the tab
+            if (g_TabIntel) g_TabIntel->OnTabClosed((uint64_t)ch->tabs[ch->activeTab].id);
+
             if (ch->engine)
                 ch->engine->CloseTab(ch->tabs[ch->activeTab].id);
             ch->tabs.erase(ch->tabs.begin() + ch->activeTab);
@@ -1026,6 +1152,94 @@ bool OnKeyDown(HWND hwnd, WPARAM vk, LPARAM lParam) {
 }
 
 // ---------------------------------------------------------------------------
+// URL bar dark theme — handles WM_CTLCOLOREDIT from the parent window.
+// Returns a brush if the EDIT is our URL bar, or nullptr to use defaults.
+// ---------------------------------------------------------------------------
+HBRUSH OnCtlColorEdit(HWND hwnd, HDC hdc, HWND hEdit) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch || hEdit != ch->hUrlBar) return nullptr;
+
+    // Dark theme: light text on dark background
+    SetTextColor(hdc, RGB(232, 232, 240));   // CLR_TEXT
+    SetBkColor(hdc, RGB(22, 24, 42));        // CLR_BG_CARD
+    return ch->hUrlBgBrush;
+}
+
+// ---------------------------------------------------------------------------
+// Right-click context menu — standard browser actions
+// ---------------------------------------------------------------------------
+#define IDM_CTX_BACK     40001
+#define IDM_CTX_FORWARD  40002
+#define IDM_CTX_RELOAD   40003
+#define IDM_CTX_NEWTAB   40004
+#define IDM_CTX_VIEWSRC  40005
+#define IDM_CTX_INSPECT  40006
+
+void OnContextMenu(HWND hwnd, int screenX, int screenY) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    // Only show context menu in content area (below chrome)
+    POINT pt = { screenX, screenY };
+    ScreenToClient(hwnd, &pt);
+    if (pt.y < CHROME_H) return;  // Chrome area — don't show
+
+    HMENU hMenu = CreatePopupMenu();
+    if (!hMenu) return;
+
+    // Back/Forward — greyed out when unavailable
+    bool hasBack = (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size() &&
+                    ch->tabs[ch->activeTab].url != "aeon://newtab" &&
+                    ch->tabs[ch->activeTab].url != "about:blank");
+    AppendMenuA(hMenu, MF_STRING | (hasBack ? 0 : MF_GRAYED),
+                IDM_CTX_BACK, "&Back");
+    AppendMenuA(hMenu, MF_STRING | MF_GRAYED,
+                IDM_CTX_FORWARD, "&Forward");
+    AppendMenuA(hMenu, MF_STRING, IDM_CTX_RELOAD, "&Reload\tF5");
+    AppendMenuA(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuA(hMenu, MF_STRING, IDM_CTX_NEWTAB, "&New Tab\tCtrl+T");
+    AppendMenuA(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuA(hMenu, MF_STRING, IDM_CTX_VIEWSRC, "View Page &Source");
+    AppendMenuA(hMenu, MF_STRING, IDM_CTX_INSPECT, "&Inspect (DevTools)");
+
+    int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
+                             screenX, screenY, 0, hwnd, nullptr);
+    DestroyMenu(hMenu);
+
+    switch (cmd) {
+        case IDM_CTX_BACK:
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->GoBack(ch->tabs[ch->activeTab].id);
+            break;
+        case IDM_CTX_FORWARD:
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->GoForward(ch->tabs[ch->activeTab].id);
+            break;
+        case IDM_CTX_RELOAD:
+            if (ch->engine && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ch->engine->Reload(ch->tabs[ch->activeTab].id, 0);
+            break;
+        case IDM_CTX_NEWTAB:
+            CreateNewTab(ch);
+            break;
+        case IDM_CTX_VIEWSRC: {
+            // Navigate to view-source: URL
+            if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+                std::string srcUrl = "view-source:" + ch->tabs[ch->activeTab].url;
+                CreateNewTab(ch, srcUrl.c_str());
+            }
+            break;
+        }
+        case IDM_CTX_INSPECT:
+            // Open DevTools via CDP (port 9222 is already enabled in engine args)
+            CreateNewTab(ch, "http://localhost:9222");
+            break;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Engine callback helpers — safely update tab state from engine events
 // ---------------------------------------------------------------------------
 void UpdateTabTitle(HWND hwnd, unsigned int tab_id, const char* title) {
@@ -1049,6 +1263,23 @@ void UpdateTabUrl(HWND hwnd, unsigned int tab_id, const char* url) {
     for (auto& t : ch->tabs) {
         if (t.id == tab_id) {
             t.url = mapped;
+            
+            // Self-correcting history state machine
+            if (t.history.empty()) {
+                t.history.push_back(mapped);
+                t.historyIndex = 0;
+            } else {
+                if (t.historyIndex - 1 >= 0 && t.history[t.historyIndex - 1] == mapped) {
+                    t.historyIndex--;
+                } else if (t.historyIndex + 1 < (int)t.history.size() && t.history[t.historyIndex + 1] == mapped) {
+                    t.historyIndex++;
+                } else if (t.history[t.historyIndex] != mapped) {
+                    // Truncate any forward history and append new navigation path
+                    t.history.erase(t.history.begin() + t.historyIndex + 1, t.history.end());
+                    t.history.push_back(mapped);
+                    t.historyIndex = (int)t.history.size() - 1;
+                }
+            }
             break;
         }
     }
@@ -1064,6 +1295,14 @@ void SetTabLoaded(HWND hwnd, unsigned int tab_id) {
             t.loading = false;
             break;
         }
+    }
+    // Kill loading timer if no tabs are still loading
+    bool anyLoading = false;
+    for (const auto& t : ch->tabs) {
+        if (t.loading) { anyLoading = true; break; }
+    }
+    if (!anyLoading) {
+        KillTimer(hwnd, ID_LOADING_TIMER);
     }
     InvalidateRect(hwnd, nullptr, FALSE);
 }
@@ -1112,6 +1351,8 @@ unsigned int CreateTab(HWND hwnd, const char* url) {
     t.url = targetUrl;
     t.title = "New Tab";
     t.loading = false;
+    t.history.push_back(targetUrl);
+    t.historyIndex = 0;
     ch->tabs.push_back(t);
     ch->activeTab = (int)ch->tabs.size() - 1;
 
@@ -1123,6 +1364,16 @@ unsigned int CreateTab(HWND hwnd, const char* url) {
     // Inject AeonBridge bootstrap
     std::string bridgeJs = AeonBridge::BuildInjectionScript();
     ch->engine->InjectEarlyJS(t.id, bridgeJs.c_str());
+
+    // AI: Notify TabIntelligence of new tab (from UI action)
+    if (g_TabIntel) {
+        AeonTabInfo info = {};
+        info.tab_id = (uint64_t)t.id;
+        _snprintf_s(info.url, sizeof(info.url), _TRUNCATE, "%s", targetUrl);
+        _snprintf_s(info.title, sizeof(info.title), _TRUNCATE, "New Tab");
+        info.state = AeonTabState::Active;
+        g_TabIntel->OnTabCreated(info);
+    }
 
     PaintChrome(ch);
     fprintf(stdout, "[Agent] New tab #%u: %s\n", t.id, targetUrl);
@@ -1136,6 +1387,9 @@ bool CloseTabById(HWND hwnd, unsigned int tabId) {
 
     for (int i = 0; i < (int)ch->tabs.size(); i++) {
         if (ch->tabs[i].id == tabId) {
+            // AI: Notify TabIntelligence BEFORE destroying the tab
+            if (g_TabIntel) g_TabIntel->OnTabClosed((uint64_t)tabId);
+
             if (ch->engine) ch->engine->CloseTab(tabId);
             ch->tabs.erase(ch->tabs.begin() + i);
             if (ch->tabs.empty()) {
@@ -1161,6 +1415,8 @@ bool FocusTabById(HWND hwnd, unsigned int tabId) {
 
     for (int i = 0; i < (int)ch->tabs.size(); i++) {
         if (ch->tabs[i].id == tabId) {
+            unsigned int prevTabId = (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
+                ? ch->tabs[ch->activeTab].id : 0;
             ch->activeTab = i;
             if (ch->engine) {
                 ch->engine->FocusTab(tabId);
@@ -1168,6 +1424,12 @@ bool FocusTabById(HWND hwnd, unsigned int tabId) {
                 ch->engine->SetViewport(tabId, hwnd, 0, CHROME_H,
                     rc.right, rc.bottom - CHROME_H);
             }
+
+            // AI: Notify AI engines of tab focus change
+            if (g_TabIntel) g_TabIntel->OnTabFocused((uint64_t)tabId);
+            if (g_JourneyAI && prevTabId != tabId)
+                g_JourneyAI->OnTabSwitch((uint64_t)prevTabId, (uint64_t)tabId);
+
             PaintChrome(ch);
             fprintf(stdout, "[Agent] Focused tab #%u\n", tabId);
             return true;
@@ -1192,6 +1454,30 @@ bool NavigateTab(HWND hwnd, unsigned int tabId, const char* url) {
         }
     }
     return false;
+}
+
+void Destroy(HWND hwnd) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (ch) {
+        // Delete all cached GDI font handles to prevent leaks
+        if (ch->hTextFont)      DeleteObject(ch->hTextFont);
+        if (ch->hTextBold)      DeleteObject(ch->hTextBold);
+        if (ch->hTextTabFont)   DeleteObject(ch->hTextTabFont);
+        if (ch->hIconFont)      DeleteObject(ch->hIconFont);
+        if (ch->hIconFontSmall) DeleteObject(ch->hIconFontSmall);
+        if (ch->hIconFontLarge) DeleteObject(ch->hIconFontLarge);
+        if (ch->hLogoFont)      DeleteObject(ch->hLogoFont);
+        if (ch->hUrlFont)       DeleteObject(ch->hUrlFont);
+
+        // Delete other cached GDI handles
+        if (ch->hUrlBgBrush)    DeleteObject(ch->hUrlBgBrush);
+
+        // Set pointer to null and delete
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, 0);
+        delete ch;
+        fprintf(stdout, "[Chrome] Browser chrome state and GDI resources cleaned up.\n");
+    }
 }
 
 } // namespace BrowserChrome

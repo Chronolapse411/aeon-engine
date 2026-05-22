@@ -8,6 +8,9 @@ namespace BrowserChrome {
     // Call once after window creation to set up the chrome.
     void Create(HWND parent, const SystemProfile* profile, AeonEngineVTable* engine);
 
+    // Cleans up all cached fonts, brushes, and state to prevent shutdown GDI leaks.
+    void Destroy(HWND hwnd);
+
     // Forward WM_PAINT to draw the chrome.
     void OnPaint(HWND hwnd);
 
@@ -29,6 +32,13 @@ namespace BrowserChrome {
 
     // WM_COMMAND from child controls (URL bar EDIT)
     void OnCommand(HWND hwnd, int id, int notifyCode, HWND ctlHwnd);
+
+    // WM_CTLCOLOREDIT — dark-theme URL bar background.
+    // Returns a brush handle if the EDIT is the URL bar, or nullptr.
+    HBRUSH OnCtlColorEdit(HWND hwnd, HDC hdc, HWND hEdit);
+
+    // WM_CONTEXTMENU — right-click context menu in content area.
+    void OnContextMenu(HWND hwnd, int screenX, int screenY);
 
     // Engine callback helpers — called by AeonMain's engine callbacks
     // to push state changes from the engine into the chrome's tab list.

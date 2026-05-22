@@ -294,6 +294,26 @@ static void InitWebView2ForTab(TabState& tab) {
                                             g_Callbacks.OnProgress(tabId, 100);
                                         if (g_Callbacks.OnLoaded)
                                             g_Callbacks.OnLoaded(tabId);
+
+                                        // ── Cosmetic CSS: element-hide rules ──
+                                        // Inject after page load to hide ad containers,
+                                        // cookie banners, and other unwanted elements.
+                                        const char* css = NativeAdBlock::GetCosmeticCSS();
+                                        if (css) {
+                                            // Wrap in <style> injection via JS
+                                            std::string js = "(() => { const s = document.createElement('style'); s.textContent = `";
+                                            js += css;
+                                            js += "`; document.head.appendChild(s); })();";
+                                            free(const_cast<char*>(css));
+
+                                            int wLen = MultiByteToWideChar(CP_UTF8, 0,
+                                                js.c_str(), -1, nullptr, 0);
+                                            wchar_t* wJs = new wchar_t[wLen];
+                                            MultiByteToWideChar(CP_UTF8, 0,
+                                                js.c_str(), -1, wJs, wLen);
+                                            sender->ExecuteScript(wJs, nullptr);
+                                            delete[] wJs;
+                                        }
                                         return S_OK;
                                     }).Get(), nullptr);
 

@@ -347,9 +347,45 @@ function navigate(url) {
 }
 
 // Load real history from native bridge if available
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000); // ts is unix seconds from C++
+  const now = new Date();
+  const diffH = (now - d) / 3600000;
+  if (diffH < 24) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } else if (diffH < 48) {
+    return 'Yesterday';
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 try {
-  const real = window.aeonBridge?.getHistory?.();
-  if (real && real.length) { allItems = real; filtered = real; }
+  const raw = window.aeonBridge?.getHistory?.();
+  if (raw && typeof raw === 'string') {
+    // Dispatch returns JSON string — parse it
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length) {
+      allItems = parsed.map(r => ({
+        title: r.title || r.url || 'Untitled',
+        url: r.url,
+        time: formatTime(r.ts),
+        ts: (r.ts || 0) * 1000, // convert to JS ms
+        count: r.count || 1
+      }));
+      filtered = [...allItems];
+    }
+  } else if (Array.isArray(raw) && raw.length) {
+    // Direct object return (WebView2 host object)
+    allItems = raw.map(r => ({
+      title: r.title || r.url || 'Untitled',
+      url: r.url,
+      time: formatTime(r.ts),
+      ts: (r.ts || 0) * 1000,
+      count: r.count || 1
+    }));
+    filtered = [...allItems];
+  }
 } catch(_) {}
 
 renderHistory(filtered);
