@@ -209,11 +209,11 @@ static LONG WINAPI VectoredHandler(EXCEPTION_POINTERS* ep) {
     }
 
     // Show minimal crash dialog (not the Windows one — ours is branded)
-    MessageBoxA(nullptr,
-        "Aeon Browser encountered an error and needs to close.\n\n"
-        "Your browsing session has been saved and will be restored on restart.\n"
-        "(Crash report queued for DelgadoLogic \xe2\x80\x94 thank you for helping us improve.)",
-        "Aeon Browser \xe2\x80\x94 Crash", MB_ICONERROR | MB_OK);
+    MessageBoxW(nullptr,
+        L"Aeon Browser encountered an error and needs to close.\n\n"
+        L"Your browsing session has been saved and will be restored on restart.\n"
+        L"(Crash report queued for DelgadoLogic \x2014 thank you for helping us improve.)",
+        L"Aeon Browser \x2014 Crash", MB_ICONERROR | MB_OK);
 
     // Terminate cleanly — do NOT let Windows show the "Send to Microsoft" dialog
     TerminateProcess(GetCurrentProcess(), static_cast<UINT>(code));

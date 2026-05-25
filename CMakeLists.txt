@@ -61,6 +61,7 @@ set(CORE_SOURCES
     core/engine/TierDispatcher.cpp
     core/engine/AeonBridge.cpp
     core/ui/BrowserChrome.cpp
+    core/ui/Aeon.rc
     core/ui/EraChrome.cpp
     core/ui/AppMenu.cpp
     core/ui/BookmarkBar.cpp
@@ -103,7 +104,7 @@ add_executable(Aeon WIN32 ${CORE_SOURCES})
 
 # Windows system libraries
 target_link_libraries(Aeon
-    kernel32 user32 gdi32 shell32 advapi32 shlwapi ole32 oleaut32
+    kernel32 user32 gdi32 gdiplus shell32 advapi32 shlwapi ole32 oleaut32
     dwmapi uxtheme dbghelp
     crypt32     # DPAPI — password vault
     winhttp     # Corporate proxy detection + captive portal probe

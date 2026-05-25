@@ -14,6 +14,9 @@ namespace BrowserChrome {
     // Forward WM_PAINT to draw the chrome.
     void OnPaint(HWND hwnd);
 
+    // Forward WM_TIMER for hover/smooth transition timers.
+    void OnTimer(HWND hwnd, WPARAM wParam);
+
     // Forward WM_SIZE to reposition content area.
     void OnSize(HWND hwnd, int w, int h);
 

@@ -42,6 +42,7 @@
 #include "../../core/probe/HardwareProbe.h"
 #include "../../core/settings/SettingsEngine.h"
 #include <windows.h>
+#include <gdiplus.h>
 #include <dwmapi.h>
 #include <cstring>
 #include <cstdio>
@@ -54,6 +55,30 @@
 #include "../../core/engine/AeonBridge.h"
 #include "../../ai/aeon_tab_intelligence.h"
 #include "../../ai/aeon_journey_analytics.h"
+#include "AppMenu.h"
+
+// Safe wide-character string conversion helpers
+static std::wstring Utf8ToUtf16(const std::string& utf8) {
+    if (utf8.empty()) return L"";
+    int wLen = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    if (wLen <= 0) return L"";
+    std::vector<wchar_t> wBuf(wLen);
+    if (MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, wBuf.data(), wLen) > 0) {
+        return std::wstring(wBuf.data());
+    }
+    return L"";
+}
+
+static std::string Utf16ToUtf8(const std::wstring& utf16) {
+    if (utf16.empty()) return "";
+    int u8Len = WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (u8Len <= 0) return "";
+    std::vector<char> u8Buf(u8Len);
+    if (WideCharToMultiByte(CP_UTF8, 0, utf16.c_str(), -1, u8Buf.data(), u8Len, nullptr, nullptr) > 0) {
+        return std::string(u8Buf.data());
+    }
+    return "";
+}
 
 extern AeonTabIntelligence* g_TabIntel;
 extern AeonJourneyAnalytics* g_JourneyAI;
@@ -87,8 +112,8 @@ static const int URLBAR_PAD  = 164; // URL bar starts here
 // Right side layout: [URL bar] [8px gap] [4 toolbar icons × 32px] [8px gap] [3 window controls × 46px]
 static const int CTRL_W      = 46;  // each window control button width
 static const int CTRL_TOTAL  = CTRL_W * 3;            // 138px for min/max/close
-static const int TOOLBAR_ICONS_W = 4 * 32;             // 128px for 4 toolbar icons
-static const int URLBAR_END  = CTRL_TOTAL + TOOLBAR_ICONS_W + 16; // 282px from right edge
+static const int TOOLBAR_ICONS_W = 6 * 32;             // 192px for 6 toolbar icons
+static const int URLBAR_END  = CTRL_TOTAL + TOOLBAR_ICONS_W + 16; // 346px from right edge
 
 // ---------------------------------------------------------------------------
 // Per-tab state
@@ -137,6 +162,8 @@ struct ChromeState {
 
     // Dark-theme URL bar brushes (created once, reused for WM_CTLCOLOREDIT)
     HBRUSH              hUrlBgBrush;   // #16182a
+
+    double              hoverAlphas[100] = { 0.0 };
 };
 
 // ---------------------------------------------------------------------------
@@ -183,6 +210,23 @@ static std::string ReverseMapUrl(const std::string& url) {
 // ---------------------------------------------------------------------------
 // GDI helper functions
 // ---------------------------------------------------------------------------
+static void FillGdiplusRoundRect(Gdiplus::Graphics& graphics, const RECT& r, int radius, Gdiplus::Brush& brush) {
+    Gdiplus::GraphicsPath path;
+    float rx = (float)radius;
+    float x = (float)r.left;
+    float y = (float)r.top;
+    float w = (float)(r.right - r.left);
+    float h = (float)(r.bottom - r.top);
+    
+    path.AddArc(x, y, rx * 2, rx * 2, 180, 90);
+    path.AddArc(x + w - rx * 2, y, rx * 2, rx * 2, 270, 90);
+    path.AddArc(x + w - rx * 2, y + h - rx * 2, rx * 2, rx * 2, 0, 90);
+    path.AddArc(x, y + h - rx * 2, rx * 2, rx * 2, 90, 90);
+    path.CloseFigure();
+    
+    graphics.FillPath(&brush, &path);
+}
+
 static void FillRectColor(HDC hdc, const RECT& r, COLORREF c) {
     HBRUSH b = CreateSolidBrush(c);
     FillRect(hdc, &r, b);
@@ -203,16 +247,16 @@ static void DrawRoundRect(HDC hdc, const RECT& r, int rx, COLORREF fill, COLORRE
 
 static void DrawText16(HDC hdc, const char* text, const RECT& r,
                        COLORREF c, HFONT hFont) {
+    if (!text) return;
     HFONT old = (HFONT)SelectObject(hdc, hFont);
     SetTextColor(hdc, c);
     SetBkMode(hdc, TRANSPARENT);
-    // Convert UTF-8 to wide string for proper Unicode rendering
-    int wLen = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
-    wchar_t* wBuf = (wchar_t*)_alloca(wLen * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, text, -1, wBuf, wLen);
-    RECT dr = r;
-    DrawTextW(hdc, wBuf, -1, &dr,
-        DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    std::wstring wStr = Utf8ToUtf16(text);
+    if (!wStr.empty()) {
+        RECT dr = r;
+        DrawTextW(hdc, wStr.c_str(), -1, &dr,
+            DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
     SelectObject(hdc, old);
 }
 
@@ -237,6 +281,8 @@ static void DrawIcon(HDC hdc, const wchar_t* glyph, const RECT& r,
 #define ICON_DOWNLOAD  L"\uE896"
 #define ICON_BOOKMARK  L"\uE734"
 #define ICON_SHIELD    L"\uE83D"
+#define ICON_AI_SUMMARY L"\uF602"
+#define ICON_AI_JOURNEY L"\uE81C"
 #define ICON_MORE      L"\uE712"
 #define ICON_MINIMIZE  L"\uE921"
 #define ICON_MAXIMIZE  L"\uE922"
@@ -250,47 +296,60 @@ static void DrawIcon(HDC hdc, const wchar_t* glyph, const RECT& r,
 // ---------------------------------------------------------------------------
 static void DrawLogoBadge(HDC hdc, int x, int y, HFONT hLogoFont) {
     const int SIZE = 28;
-    // Gradient approximation — 4 vertical bands from accent to accent2
-    COLORREF gradColors[] = {
-        RGB(108, 99, 255),  // #6c63ff top
-        RGB(120, 108, 253), // mid-upper
-        RGB(140, 120, 252), // mid-lower
-        RGB(167, 139, 250)  // #a78bfa bottom
-    };
-    int bandH = SIZE / 4;
-    for (int i = 0; i < 4; i++) {
-        RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
-        if (i == 0) band.top += 1;  // rounded top visual offset
-        FillRectColor(hdc, band, gradColors[i]);
+    bool loaded = false;
+    
+    // Attempt GDI+ render of Aeon_28.png
+    Gdiplus::Image image(L"resources/icons/Aeon_28.png");
+    if (image.GetLastStatus() == Gdiplus::Ok) {
+        Gdiplus::Graphics graphics(hdc);
+        if (graphics.DrawImage(&image, x, y, SIZE, SIZE) == Gdiplus::Ok) {
+            loaded = true;
+        }
     }
+    
+    if (!loaded) {
+        // Gradient approximation — 4 vertical bands from accent to accent2
+        COLORREF gradColors[] = {
+            RGB(108, 99, 255),  // #6c63ff top
+            RGB(120, 108, 253), // mid-upper
+            RGB(140, 120, 252), // mid-lower
+            RGB(167, 139, 250)  // #a78bfa bottom
+        };
+        int bandH = SIZE / 4;
+        for (int i = 0; i < 4; i++) {
+            RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
+            if (i == 0) band.top += 1;  // rounded top visual offset
+            FillRectColor(hdc, band, gradColors[i]);
+        }
 
-    // Rounded corners via clipping region
-    HRGN rgn = CreateRoundRectRgn(x, y, x + SIZE + 1, y + SIZE + 1, 8, 8);
-    SelectClipRgn(hdc, rgn);
-    for (int i = 0; i < 4; i++) {
-        RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
-        FillRectColor(hdc, band, gradColors[i]);
+        // Rounded corners via clipping region
+        HRGN rgn = CreateRoundRectRgn(x, y, x + SIZE + 1, y + SIZE + 1, 8, 8);
+        SelectClipRgn(hdc, rgn);
+        for (int i = 0; i < 4; i++) {
+            RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
+            FillRectColor(hdc, band, gradColors[i]);
+        }
+        SelectClipRgn(hdc, nullptr);
+        DeleteObject(rgn);
+
+        // Subtle border highlight
+        HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(140, 130, 255));
+        HBRUSH nullBr = (HBRUSH)GetStockObject(NULL_BRUSH);
+        HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
+        HBRUSH oldBr = (HBRUSH)SelectObject(hdc, nullBr);
+        RoundRect(hdc, x, y, x + SIZE, y + SIZE, 8, 8);
+        SelectObject(hdc, oldPen);
+        SelectObject(hdc, oldBr);
+        DeleteObject(borderPen);
+
+        // "A" lettermark — bold, white, centered
+        RECT textR = { x, y, x + SIZE, y + SIZE };
+        HFONT old = (HFONT)SelectObject(hdc, hLogoFont);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        SetBkMode(hdc, TRANSPARENT);
+        DrawTextA(hdc, "A", -1, &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(hdc, old);
     }
-    SelectClipRgn(hdc, nullptr);
-    DeleteObject(rgn);
-
-    // Subtle border highlight
-    HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(140, 130, 255));
-    HBRUSH nullBr = (HBRUSH)GetStockObject(NULL_BRUSH);
-    HPEN oldPen = (HPEN)SelectObject(hdc, borderPen);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, nullBr);
-    RoundRect(hdc, x, y, x + SIZE, y + SIZE, 8, 8);
-    SelectObject(hdc, oldPen);
-    SelectObject(hdc, oldBr);
-    DeleteObject(borderPen);
-
-    // "A" lettermark — bold, white, centered
-    RECT textR = { x, y, x + SIZE, y + SIZE };
-    HFONT old = (HFONT)SelectObject(hdc, hLogoFont);
-    SetTextColor(hdc, RGB(255, 255, 255));
-    SetBkMode(hdc, TRANSPARENT);
-    DrawTextA(hdc, "A", -1, &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    SelectObject(hdc, old);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +363,36 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     // "A" logo badge — top-left, vertically centered
     DrawLogoBadge(hdc, BTN_LOGO_X, (NAV_HEIGHT - 28) / 2, ch->hLogoFont);
 
+    int urlRight = width - URLBAR_END;
+
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+    // Draw unified glassmorphic card container with subtle violet glowing outlines
+    {
+        Gdiplus::GraphicsPath path;
+        int r = 12; // radius
+        int xL = BTN_BACK_X - 6; // 46
+        int yT = 3;
+        int wC = (urlRight + 6) - xL;
+        int hC = (NAV_HEIGHT - 3) - yT; // 34px height
+
+        // Create a rounded rectangle path
+        path.AddArc((float)xL, (float)yT, (float)r, (float)r, 180, 90);
+        path.AddArc((float)(xL + wC - r), (float)yT, (float)r, (float)r, 270, 90);
+        path.AddArc((float)(xL + wC - r), (float)(yT + hC - r), (float)r, (float)r, 0, 90);
+        path.AddArc((float)xL, (float)(yT + hC - r), (float)r, (float)r, 90, 90);
+        path.CloseFigure();
+
+        // Fill with semi-transparent dark background for glassmorphic card effect
+        Gdiplus::SolidBrush fillBrush(Gdiplus::Color(200, 22, 24, 42)); // glassmorphic bg
+        graphics.FillPath(&fillBrush, &path);
+
+        // Outline with a subtle violet glowing border
+        Gdiplus::Pen borderPen(Gdiplus::Color(120, 167, 139, 250), 1.0f); // subtle violet glow outline
+        graphics.DrawPath(&borderPen, &path);
+    }
+
     // Determine back/forward availability from tab history stack
     bool canGoBack = false, canGoForward = false;
     if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
@@ -314,42 +403,49 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
 
     // Nav buttons: ← → ↻  (flat icons, no card borders — modern browser style)
     // Back and Forward dim to text-faint when unavailable
-    struct { int x; const wchar_t* icon; bool enabled; } navBtns[] = {
-        { BTN_BACK_X, ICON_BACK,    canGoBack },
-        { BTN_FWD_X,  ICON_FORWARD, canGoForward },
-        { BTN_REF_X,  ICON_REFRESH, true }
+    struct { int x; const wchar_t* icon; bool enabled; int id; } navBtns[] = {
+        { BTN_BACK_X, ICON_BACK,    canGoBack, 1 },
+        { BTN_FWD_X,  ICON_FORWARD, canGoForward, 2 },
+        { BTN_REF_X,  ICON_REFRESH, true, 3 }
     };
     for (int bi = 0; bi < 3; bi++) {
         auto& b = navBtns[bi];
         RECT br = { b.x, 4, b.x + BTN_BACK_W, NAV_HEIGHT - 4 };
-        bool isHover = (ch->hoverBtn == (bi + 1));
-        if (isHover && b.enabled) {
-            DrawRoundRect(hdc, br, 6, CLR_BG_CARD, CLR_BG_CARD);
+        double alpha = ch->hoverAlphas[b.id];
+        if (alpha > 0.0 && b.enabled) {
+            Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(alpha * 40.0), 255, 255, 255));
+            FillGdiplusRoundRect(graphics, br, 6, hoverBrush);
         }
-        COLORREF iconColor = !b.enabled ? CLR_TEXT_FAINT :
-                             isHover ? CLR_TEXT : CLR_TEXT_DIM;
-        DrawIcon(hdc, b.icon, br, iconColor, ch->hIconFont);
+        COLORREF baseColor = !b.enabled ? CLR_TEXT_FAINT : CLR_TEXT_DIM;
+        COLORREF hoverColor = CLR_TEXT;
+        BYTE rIcon = (BYTE)( (1.0 - alpha) * GetRValue(baseColor) + alpha * GetRValue(hoverColor) );
+        BYTE gIcon = (BYTE)( (1.0 - alpha) * GetGValue(baseColor) + alpha * GetGValue(hoverColor) );
+        BYTE bIcon = (BYTE)( (1.0 - alpha) * GetBValue(baseColor) + alpha * GetBValue(hoverColor) );
+        DrawIcon(hdc, b.icon, br, RGB(rIcon, gIcon, bIcon), ch->hIconFont);
     }
 
     // URL bar
     int urlLeft  = URLBAR_PAD;
-    int urlRight = width - URLBAR_END;
     RECT urlR = { urlLeft, 6, urlRight, NAV_HEIGHT - 6 };
     COLORREF urlBorder = ch->urlFocused ? CLR_ACCENT : RGB(30, 33, 50);
     DrawRoundRect(hdc, urlR, 12, CLR_BG_CARD, urlBorder);
 
-    // Lock icon — proper MDL2 lock glyph
-    RECT lockR = { urlLeft + 6, 6, urlLeft + 24, NAV_HEIGHT - 6 };
+    // Lock icon — proper MDL2 lock glyph with dynamic DPI padding
+    HDC hdcTemp = GetDC(ch->hwnd);
+    int dpiY = GetDeviceCaps(hdcTemp, LOGPIXELSY);
+    ReleaseDC(ch->hwnd, hdcTemp);
+    int padX = MulDiv(6, dpiY, 72);
+    RECT lockR = { urlLeft + padX, 6, urlLeft + padX + 18, NAV_HEIGHT - 6 };
     DrawIcon(hdc, ICON_LOCK, lockR, CLR_GREEN, ch->hIconFontSmall);
 
-    // URL text
+    // URL text with breathing 10px gap from lock icon
     const char* urlTxt = "about:blank";
     if (!ch->tabs.empty() && ch->activeTab >= 0 &&
         ch->activeTab < (int)ch->tabs.size()) {
         const auto& t = ch->tabs[ch->activeTab];
         urlTxt = t.url.c_str();
     }
-    RECT urlTextR = { urlLeft + 26, 6, urlRight - 32, NAV_HEIGHT - 6 };
+    RECT urlTextR = { urlLeft + padX + 28, 6, urlRight - 32, NAV_HEIGHT - 6 };
     DrawText16(hdc, urlTxt, urlTextR, CLR_TEXT, ch->hTextFont);
 
     // AdBlock shield — small green dot indicator
@@ -364,18 +460,24 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     // Right icon buttons: Downloads, Bookmarks, Tor/Shield, Menu
     // Positioned between URL bar end and window controls
     int toolbarStart = width - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
-    const wchar_t* rightIcons[] = { ICON_DOWNLOAD, ICON_BOOKMARK, ICON_SHIELD, ICON_MORE };
+    const wchar_t* rightIcons[] = { ICON_DOWNLOAD, ICON_BOOKMARK, ICON_SHIELD, ICON_AI_SUMMARY, ICON_AI_JOURNEY, ICON_MORE };
     COLORREF torColor = ch->settings.tor_enabled ? CLR_GREEN : CLR_TEXT_DIM;
-    COLORREF iconColors[] = { CLR_TEXT_DIM, CLR_TEXT_DIM, torColor, CLR_TEXT_DIM };
-    for (int i = 0; i < 4; i++) {
+    COLORREF iconColors[] = { CLR_TEXT_DIM, CLR_TEXT_DIM, torColor, CLR_TEXT_DIM, CLR_TEXT_DIM, CLR_TEXT_DIM };
+    for (int i = 0; i < 6; i++) {
         RECT ir = { toolbarStart + i * 32, 4,
                     toolbarStart + i * 32 + 28, NAV_HEIGHT - 4 };
-        bool iconHover = (ch->hoverBtn == 20 + i);
-        if (iconHover) {
-            DrawRoundRect(hdc, ir, 6, CLR_BG_CARD, CLR_BG_CARD);
+        int btnId = 20 + i;
+        double alpha = ch->hoverAlphas[btnId];
+        if (alpha > 0.0) {
+            Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(alpha * 40.0), 255, 255, 255));
+            FillGdiplusRoundRect(graphics, ir, 6, hoverBrush);
         }
-        COLORREF ic = iconHover ? CLR_TEXT : iconColors[i];
-        DrawIcon(hdc, rightIcons[i], ir, ic, ch->hIconFontLarge);
+        COLORREF baseColor = iconColors[i];
+        COLORREF hoverColor = CLR_TEXT;
+        BYTE rIcon = (BYTE)( (1.0 - alpha) * GetRValue(baseColor) + alpha * GetRValue(hoverColor) );
+        BYTE gIcon = (BYTE)( (1.0 - alpha) * GetGValue(baseColor) + alpha * GetGValue(hoverColor) );
+        BYTE bIcon = (BYTE)( (1.0 - alpha) * GetBValue(baseColor) + alpha * GetBValue(hoverColor) );
+        DrawIcon(hdc, rightIcons[i], ir, RGB(rIcon, gIcon, bIcon), ch->hIconFontLarge);
     }
 
     // Window control buttons: minimize, maximize/restore, close
@@ -383,25 +485,40 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
     RECT minR  = { width - CTRL_TOTAL,          0, width - CTRL_W * 2, NAV_HEIGHT };
     RECT maxR  = { width - CTRL_W * 2,          0, width - CTRL_W,     NAV_HEIGHT };
     RECT clsR  = { width - CTRL_W,              0, width,              NAV_HEIGHT };
+    
     // Minimize hover
-    if (ch->hoverBtn == 10) {
-        FillRectColor(hdc, minR, CLR_BG_CARD);
+    double minAlpha = ch->hoverAlphas[10];
+    if (minAlpha > 0.0) {
+        Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(minAlpha * 40.0), 255, 255, 255));
+        FillGdiplusRoundRect(graphics, minR, 6, hoverBrush);
     }
-    DrawIcon(hdc, ICON_MINIMIZE, minR, ch->hoverBtn == 10 ? CLR_TEXT : CLR_TEXT_DIM, ch->hIconFont);
+    BYTE rMinIcon = (BYTE)( (1.0 - minAlpha) * GetRValue(CLR_TEXT_DIM) + minAlpha * 255 );
+    BYTE gMinIcon = (BYTE)( (1.0 - minAlpha) * GetGValue(CLR_TEXT_DIM) + minAlpha * 255 );
+    BYTE bMinIcon = (BYTE)( (1.0 - minAlpha) * GetBValue(CLR_TEXT_DIM) + minAlpha * 255 );
+    DrawIcon(hdc, ICON_MINIMIZE, minR, RGB(rMinIcon, gMinIcon, bMinIcon), ch->hIconFont);
+
     // Maximize hover
-    if (ch->hoverBtn == 11) {
-        FillRectColor(hdc, maxR, CLR_BG_CARD);
+    double maxAlpha = ch->hoverAlphas[11];
+    if (maxAlpha > 0.0) {
+        Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(maxAlpha * 40.0), 255, 255, 255));
+        FillGdiplusRoundRect(graphics, maxR, 6, hoverBrush);
     }
+    BYTE rMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetRValue(CLR_TEXT_DIM) + maxAlpha * 255 );
+    BYTE gMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetGValue(CLR_TEXT_DIM) + maxAlpha * 255 );
+    BYTE bMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetBValue(CLR_TEXT_DIM) + maxAlpha * 255 );
     DrawIcon(hdc, IsZoomed(ch->hwnd) ? ICON_RESTORE : ICON_MAXIMIZE, maxR,
-             ch->hoverBtn == 11 ? CLR_TEXT : CLR_TEXT_DIM, ch->hIconFont);
-    // Close button — red background on hover
-    bool closeHover = (ch->hoverBtn == 99);
-    if (closeHover) {
-        FillRectColor(hdc, clsR, RGB(196, 43, 28));
-        DrawIcon(hdc, ICON_CLOSE, clsR, RGB(255, 255, 255), ch->hIconFont);
-    } else {
-        DrawIcon(hdc, ICON_CLOSE, clsR, CLR_TEXT_DIM, ch->hIconFont);
+             RGB(rMaxIcon, gMaxIcon, bMaxIcon), ch->hIconFont);
+
+    // Close button — red background on hover with smooth transition
+    double closeAlpha = ch->hoverAlphas[99];
+    if (closeAlpha > 0.0) {
+        Gdiplus::SolidBrush closeBrush(Gdiplus::Color((BYTE)(closeAlpha * 255.0), 196, 43, 28));
+        graphics.FillRectangle(&closeBrush, (float)clsR.left, (float)clsR.top, (float)(clsR.right - clsR.left), (float)(clsR.bottom - clsR.top));
     }
+    BYTE rCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetRValue(CLR_TEXT_DIM) + closeAlpha * 255 );
+    BYTE gCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetGValue(CLR_TEXT_DIM) + closeAlpha * 255 );
+    BYTE bCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetBValue(CLR_TEXT_DIM) + closeAlpha * 255 );
+    DrawIcon(hdc, ICON_CLOSE, clsR, RGB(rCloseIcon, gCloseIcon, bCloseIcon), ch->hIconFont);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +526,7 @@ static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
 // ---------------------------------------------------------------------------
 static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
     RECT tabStrip = { 0, NAV_HEIGHT, width, NAV_HEIGHT + TAB_HEIGHT };
-    FillRectColor(hdc, tabStrip, RGB(10, 11, 17)); // slightly darker than nav
+    FillRectColor(hdc, tabStrip, CLR_BG_PRIMARY); // #0d0e14 primary bg
 
     // Bottom separator line
     RECT sep = { 0, NAV_HEIGHT + TAB_HEIGHT - 1, width, NAV_HEIGHT + TAB_HEIGHT };
@@ -431,15 +548,120 @@ static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
         RECT tR = { tabX, NAV_HEIGHT + 2, tabX + tabW, NAV_HEIGHT + TAB_HEIGHT - 1 };
         t.tabRect = tR;
 
-        // Tab background
-        COLORREF tabBg  = active ? CLR_BG_ACTIVE : (hover ? CLR_BG_CARD : RGB(10,11,17));
-        COLORREF tabBrd = active ? CLR_ACCENT     : CLR_TEXT_FAINT;
-        DrawRoundRect(hdc, tR, 6, tabBg, tabBrd);
-
-        // Active tab: bottom violet glow bar
+        // Tab background with smooth color-shifting animation on hover/active
+        COLORREF tabBg = CLR_BG_PRIMARY; // default inactive: #0d0e14
         if (active) {
-            RECT glow = { tR.left + 3, tR.bottom - 2, tR.right - 3, tR.bottom + 1 };
-            FillRectColor(hdc, glow, CLR_ACCENT);
+            tabBg = CLR_BG_ACTIVE; // #1e2140
+        } else if (hover) {
+            // Smoothly shift/pulse card background (#16182a) to a slightly lighter violet hue
+            DWORD tick = GetTickCount();
+            double factor = (sin(tick * 0.006) + 1.0) / 2.0;
+            int r = (int)(22 + factor * 8);   // 22 (#16) to 30 (#1e)
+            int g = (int)(24 + factor * 9);   // 24 (#18) to 33 (#21)
+            int b = (int)(42 + factor * 22);  // 42 (#2a) to 64 (#40)
+            tabBg = RGB(r, g, b);
+        }
+        
+        COLORREF tabBrd = active ? CLR_ACCENT : CLR_TEXT_FAINT;
+        
+        // Re-architect tab drawing using GDI+ GraphicsPath for organic curved tabs
+        {
+            Gdiplus::Graphics graphics(hdc);
+            graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+            Gdiplus::GraphicsPath tabPath;
+            float xL = (float)tR.left;
+            float xR = (float)tR.right;
+            float yT = (float)tR.top;
+            float yB = (float)tR.bottom;
+
+            // Curved tab shape flowing naturally from the tab edge into baseline:
+            // Start at bottom-left (extended outward by 8px for smooth transition)
+            tabPath.AddLine(xL - 8.0f, yB, xL - 4.0f, yB);
+            // Curve up to the top of the tab
+            tabPath.AddBezier(
+                xL - 4.0f, yB,
+                xL + 1.0f, yB,
+                xL + 1.0f, yT,
+                xL + 8.0f, yT
+            );
+            // Line across the top of the tab
+            tabPath.AddLine(xL + 8.0f, yT, xR - 8.0f, yT);
+            // Curve down to the bottom-right
+            tabPath.AddBezier(
+                xR - 8.0f, yT,
+                xR - 1.0f, yT,
+                xR - 1.0f, yB,
+                xR + 4.0f, yB
+            );
+            tabPath.AddLine(xR + 4.0f, yB, xR + 8.0f, yB);
+            tabPath.CloseFigure();
+
+            // Fill curved tab
+            Gdiplus::SolidBrush tabFillBrush(Gdiplus::Color(
+                255, 
+                GetRValue(tabBg), 
+                GetGValue(tabBg), 
+                GetBValue(tabBg)
+            ));
+            graphics.FillPath(&tabFillBrush, &tabPath);
+
+            if (active) {
+                // Active tab glowing violet accent lines
+                Gdiplus::GraphicsPath topGlowPath;
+                topGlowPath.AddBezier(
+                    xL - 4.0f, yB,
+                    xL + 1.0f, yB,
+                    xL + 1.0f, yT,
+                    xL + 8.0f, yT
+                );
+                topGlowPath.AddLine(xL + 8.0f, yT, xR - 8.0f, yT);
+                topGlowPath.AddBezier(
+                    xR - 8.0f, yT,
+                    xR - 1.0f, yT,
+                    xR - 1.0f, yB,
+                    xR + 4.0f, yB
+                );
+
+                // Outer glow (thick, semi-transparent)
+                Gdiplus::Pen glowPen1(Gdiplus::Color(100, 108, 99, 255), 3.0f); // #6c63ff with transparency
+                graphics.DrawPath(&glowPen1, &topGlowPath);
+
+                // Inner core (thin, bright violet)
+                Gdiplus::Pen glowPen2(Gdiplus::Color(255, 167, 139, 250), 1.5f); // #a78bfa
+                graphics.DrawPath(&glowPen2, &topGlowPath);
+
+                // Bottom violet glow connection line with fading edges
+                float xGlow = (float)(tR.left + 3);
+                float yGlow = (float)(tR.bottom - 2);
+                float wGlow = (float)(tR.right - tR.left - 6);
+                float hGlow = 3.0f; // Height of glow bar
+                Gdiplus::RectF glowRect(xGlow, yGlow, wGlow, hGlow);
+
+                Gdiplus::Color accentColor(255, 108, 99, 255); // CLR_ACCENT #6c63ff is RGB(108, 99, 255)
+                Gdiplus::Color transAccent(0, 108, 99, 255);
+
+                Gdiplus::Color glowColors[] = { transAccent, accentColor, transAccent };
+                float glowPositions[] = { 0.0f, 0.5f, 1.0f };
+
+                Gdiplus::LinearGradientBrush glowBrush(
+                    glowRect,
+                    transAccent,
+                    transAccent,
+                    Gdiplus::LinearGradientModeHorizontal
+                );
+                glowBrush.SetInterpolationColors(glowColors, glowPositions, 3);
+                graphics.FillRectangle(&glowBrush, glowRect);
+            } else {
+                // Inactive/hover tab outline (subtle)
+                Gdiplus::Pen borderPen(Gdiplus::Color(
+                    255, 
+                    GetRValue(tabBrd), 
+                    GetGValue(tabBrd), 
+                    GetBValue(tabBrd)
+                ), 1.0f);
+                graphics.DrawPath(&borderPen, &tabPath);
+            }
         }
 
         // Tab favicon or loading indicator
@@ -620,6 +842,36 @@ void OnPaint(HWND hwnd) {
     }
 }
 
+void OnTimer(HWND hwnd, WPARAM wParam) {
+    if (wParam != 9005) return;
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    bool anyActive = false;
+    double delta = 0.15;
+
+    for (int i = 0; i < 100; i++) {
+        double target = (ch->hoverBtn == i) ? 1.0 : 0.0;
+        if (ch->hoverAlphas[i] != target) {
+            if (ch->hoverAlphas[i] < target) {
+                ch->hoverAlphas[i] += delta;
+                if (ch->hoverAlphas[i] > target) ch->hoverAlphas[i] = target;
+            } else {
+                ch->hoverAlphas[i] -= delta;
+                if (ch->hoverAlphas[i] < target) ch->hoverAlphas[i] = target;
+            }
+            anyActive = true;
+        }
+    }
+
+    if (anyActive) {
+        PaintChrome(ch);
+    } else {
+        KillTimer(hwnd, 9005);
+    }
+}
+
 void OnSize(HWND hwnd, int w, int h) {
     ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -705,11 +957,9 @@ static void ActivateUrlBar(ChromeState* ch, bool selectAll = true) {
     if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size())
         url = ch->tabs[ch->activeTab].url.c_str();
 
-    // Convert UTF-8 to UTF-16 wide string for EDIT control
-    int wLen = MultiByteToWideChar(CP_UTF8, 0, url, -1, nullptr, 0);
-    wchar_t* wBuf = (wchar_t*)_alloca(wLen * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, url, -1, wBuf, wLen);
-    SetWindowTextW(ch->hUrlBar, wBuf);
+    // Convert UTF-8 to UTF-16 wide string for EDIT control using safe helper
+    std::wstring wUrl = Utf8ToUtf16(url);
+    SetWindowTextW(ch->hUrlBar, wUrl.c_str());
 
     ShowWindow(ch->hUrlBar, SW_SHOW);
     SetFocus(ch->hUrlBar);
@@ -732,14 +982,8 @@ static void CommitUrlBar(ChromeState* ch) {
 
     if (wbuf[0] == L'\0') return;
 
-    // Convert wide to UTF-8
-    std::string url;
-    int u8Len = WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, nullptr, 0, nullptr, nullptr);
-    if (u8Len > 0) {
-        std::vector<char> u8Buf(u8Len);
-        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, u8Buf.data(), u8Len, nullptr, nullptr);
-        url = u8Buf.data();
-    }
+    // Convert wide to UTF-8 using safe helper
+    std::string url = Utf16ToUtf8(wbuf);
 
     if (url.empty()) return;
 
@@ -808,11 +1052,11 @@ int HitTest(HWND hwnd, int x, int y) {
         if (x >= W - CTRL_W * 2)          return 11; // maximize
         if (x >= W - CTRL_TOTAL)          return 10; // minimize
 
-        // Toolbar icons: Downloads, Bookmarks, Shield, Menu
+        // Toolbar icons: Downloads, Bookmarks, Shield, AI Summary, AI Journey, Menu
         int toolbarStart = W - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
         if (x >= toolbarStart && x < toolbarStart + TOOLBAR_ICONS_W) {
             int iconIdx = (x - toolbarStart) / 32;
-            return 20 + iconIdx; // 20=download, 21=bookmark, 22=shield, 23=menu
+            return 20 + iconIdx; // 20=download, 21=bookmark, 22=shield, 23=AI Summary, 24=AI Journey, 25=menu
         }
 
         // Logo badge
@@ -882,6 +1126,17 @@ static void CreateNewTab(ChromeState* ch, const char* url = "aeon://newtab") {
 // ---------------------------------------------------------------------------
 // Mouse event handlers
 // ---------------------------------------------------------------------------
+static void NavigateActiveTab(ChromeState* ch, const char* url) {
+    if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+        auto& t = ch->tabs[ch->activeTab];
+        t.url = url;
+        t.loading = true;
+        if (ch->engine) ch->engine->Navigate(t.id, url, nullptr);
+        SetTimer(ch->hwnd, ID_LOADING_TIMER, LOADING_TIMER_MS, nullptr);
+        PaintChrome(ch);
+    }
+}
+
 void OnLButtonDown(HWND hwnd, int x, int y) {
     ChromeState* ch = reinterpret_cast<ChromeState*>(
         GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -934,16 +1189,61 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
             CreateNewTab(ch);
             break;
 
-        case 20: // Download button (placeholder)
-        case 21: // Bookmarks button (placeholder)
-        case 23: // Menu button (placeholder)
-            // TODO: implement dropdown panels for these
+        case 20: // Downloads button
+            NavigateActiveTab(ch, "aeon://downloads");
+            break;
+
+        case 21: // Bookmarks button
+            NavigateActiveTab(ch, "aeon://bookmarks");
             break;
 
         case 22: // Tor/Shield toggle
             ch->settings.tor_enabled = !ch->settings.tor_enabled;
+            SettingsEngine::Save(ch->settings);
+            NetworkSentinel::ApplyBestStrategy();
             PaintChrome(ch);
             break;
+
+        case 23: // AI Summary button
+            NavigateActiveTab(ch, "aeon://intelligence");
+            break;
+
+        case 24: // AI Journey button
+            NavigateActiveTab(ch, "aeon://journey");
+            break;
+
+        case 25: { // Menu button (More)
+            int toolbarStart = rc.right - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
+            POINT pt = { toolbarStart + 5 * 32 + 28, NAV_HEIGHT };
+            ClientToScreen(ch->hwnd, &pt);
+            
+            auto callback = [ch](AppMenu::ItemId id) {
+                switch (id) {
+                    case AppMenu::ItemId::History:
+                        NavigateActiveTab(ch, "aeon://history");
+                        break;
+                    case AppMenu::ItemId::Downloads:
+                        NavigateActiveTab(ch, "aeon://downloads");
+                        break;
+                    case AppMenu::ItemId::Bookmarks:
+                        NavigateActiveTab(ch, "aeon://bookmarks");
+                        break;
+                    case AppMenu::ItemId::Settings:
+                        NavigateActiveTab(ch, "aeon://settings");
+                        break;
+                    case AppMenu::ItemId::Exit:
+                        DestroyWindow(ch->hwnd);
+                        break;
+                    case AppMenu::ItemId::NewTab:
+                        CreateNewTab(ch);
+                        break;
+                    default:
+                        break;
+                }
+            };
+            AppMenu::Show(ch->hwnd, pt, callback);
+            break;
+        }
 
         default:
             // Tab click (100+i)
@@ -1011,7 +1311,7 @@ void OnMouseMove(HWND hwnd, int x, int y) {
             case 10:                  ch->hoverBtn = 10;  break;  // minimize
             case 11:                  ch->hoverBtn = 11;  break;  // maximize
             case 12:                  ch->hoverBtn = 99;  break;  // close (99 for red bg)
-            case 20: case 21: case 22: case 23:
+            case 20: case 21: case 22: case 23: case 24: case 25:
                                       ch->hoverBtn = hit; break;  // toolbar icons
         }
     }
@@ -1028,6 +1328,9 @@ void OnMouseMove(HWND hwnd, int x, int y) {
     }
 
     if (ch->hoverTab != oldHover || ch->hoverBtn != oldBtn) {
+        if (ch->hoverBtn != oldBtn) {
+            SetTimer(hwnd, 9005, 16, nullptr);
+        }
         PaintChrome(ch);
     }
 }

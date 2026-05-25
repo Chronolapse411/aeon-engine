@@ -64,7 +64,9 @@ if (-not $clOk)    {
         cmd /c "`"$($vcvars.FullName)`" && set" | Where-Object { $_ -match "=" } |
             ForEach-Object {
                 $parts = $_.Split("=",2)
-                [System.Environment]::SetEnvironmentVariable($parts[0],$parts[1],"Process")
+                $name = $parts[0].Trim()
+                $val  = $parts[1].Trim()
+                Set-Item -Path "Env:\$name" -Value $val
             }
         OK "MSVC environment loaded."
     } else {

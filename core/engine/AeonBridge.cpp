@@ -805,7 +805,38 @@ std::string BuildInjectionScript() {
         JBool(sst.bypass_active).c_str()
     );
 
-    return std::string(script);
+    return std::string(script) + "\n"
+        "(function() {\n"
+        "  const style = document.createElement('style');\n"
+        "  style.textContent = `\n"
+        "    ::-webkit-scrollbar {\n"
+        "        width: 10px !important;\n"
+        "        height: 10px !important;\n"
+        "    }\n"
+        "    ::-webkit-scrollbar-track {\n"
+        "        background: #0d0e14 !important;\n"
+        "    }\n"
+        "    ::-webkit-scrollbar-thumb {\n"
+        "        background: #3e3d5c !important;\n"
+        "        border-radius: 5px !important;\n"
+        "        border: 2px solid #0d0e14 !important;\n"
+        "    }\n"
+        "    ::-webkit-scrollbar-thumb:hover {\n"
+        "        background: #6c63ff !important;\n"
+        "    }\n"
+        "  `;\n"
+        "  if (document.head) {\n"
+        "    document.head.appendChild(style);\n"
+        "  } else {\n"
+        "    const obs = new MutationObserver((m, o) => {\n"
+        "      if (document.head || document.documentElement) {\n"
+        "        (document.head || document.documentElement).appendChild(style);\n"
+        "        o.disconnect();\n"
+        "      }\n"
+        "    });\n"
+        "    obs.observe(document.documentElement || document, { childList: true, subtree: true });\n"
+        "  }\n"
+        "})();\n";
 }
 
 } // namespace AeonBridge

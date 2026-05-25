@@ -1,0 +1,3 @@
+// Aeon.rc — Main Browser Resource Script
+#include <windows.h>
+IDI_AEON ICON "../../resources/icons/Aeon.ico"

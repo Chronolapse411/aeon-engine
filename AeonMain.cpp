@@ -14,8 +14,11 @@
 #include <dwmapi.h>
 #include <shlobj.h>
 #include <cstdio>
+#include <objidl.h>
+#include <gdiplus.h>
 
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "gdiplus.lib")
 
 #include "core/AeonVersion.h"
 #include "core/probe/HardwareProbe.h"
@@ -62,7 +65,19 @@ AeonJourneyAnalytics* g_JourneyAI = nullptr;
 // Declared in TierDispatcher.cpp — loads the engine DLL chain
 AeonEngineVTable* TierDispatcher_LoadEngine(const SystemProfile* profile);
 
+struct GdiplusInit {
+    ULONG_PTR token;
+    GdiplusInit() {
+        Gdiplus::GdiplusStartupInput input;
+        Gdiplus::GdiplusStartup(&token, &input, nullptr);
+    }
+    ~GdiplusInit() {
+        Gdiplus::GdiplusShutdown(token);
+    }
+};
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
+    GdiplusInit gdiplusInit;
 
     // PHASE 0: Install crash handler FIRST — catches any init failures.
     AeonCrash::Install();
@@ -538,12 +553,7 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_PAINT: {
-            // BeginPaint/EndPaint is required for proper DWM composition.
-            // Without it, GDI content flashes and gets overwritten by DWM.
-            PAINTSTRUCT ps;
-            BeginPaint(hWnd, &ps);
             BrowserChrome::OnPaint(hWnd);
-            EndPaint(hWnd, &ps);
             return 0;
         }
         case WM_SIZE:
@@ -598,6 +608,10 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
         // ── Loading animation timer → repaint tab strip ──────────────────
         case WM_TIMER:
+            if (wParam == 9005 /* ID_HOVER_TIMER */) {
+                BrowserChrome::OnTimer(hWnd, wParam);
+                return 0;
+            }
             if (wParam == 9002 /* ID_LOADING_TIMER */) {
                 // Invalidate only the tab strip region for spinner animation
                 RECT tabStrip;
