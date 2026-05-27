@@ -218,7 +218,8 @@ if ($blinkDllDest -and (Test-Path $blinkDllDest)) {
 $resItems = @(
     "resources\newtab\newtab.html",
     "resources\settings\settings.html",
-    "resources\icons\Aeon.ico"
+    "resources\icons\Aeon.ico",
+    "resources\icons\Aeon_28.png"
 )
 foreach ($item in $resItems) {
     $src = "$Root\$item"
