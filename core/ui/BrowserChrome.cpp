@@ -88,11 +88,12 @@ extern AeonJourneyAnalytics* g_JourneyAI;
 // ---------------------------------------------------------------------------
 // Design tokens as Win32 COLORREFs
 // ---------------------------------------------------------------------------
-#define CLR_BG_PRIMARY   RGB(13,  14,  20)   // #0d0e14
-#define CLR_BG_CARD      RGB(22,  24,  42)   // #16182a
-#define CLR_BG_ACTIVE    RGB(30,  33,  64)   // #1e2140
-#define CLR_ACCENT       RGB(108, 99,  255)  // #6c63ff
+#define CLR_BG_PRIMARY   RGB(11,  13,  23)   // #0b0d17
+#define CLR_BG_CARD      RGB(20,  23,  43)   // #14172b
+#define CLR_BG_ACTIVE    RGB(30,  34,  61)   // #1e223d
+#define CLR_ACCENT       RGB(108, 99,  255)  // #6c63ff (Aeon Electric Purple)
 #define CLR_ACCENT2      RGB(167, 139, 250)  // #a78bfa
+#define CLR_BRAVE_ORANGE RGB(255, 85,  0)    // #ff5500 (Brave Privacy Orange Accent)
 #define CLR_TEXT         RGB(232, 232, 240)  // #e8e8f0
 #define CLR_TEXT_DIM     RGB(136, 136, 170)  // #8888aa
 #define CLR_TEXT_FAINT   RGB(68,  68,  90)   // #44445a

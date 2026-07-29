@@ -1,5 +1,6 @@
 import React from 'react';
 import TerminalDemo from './TerminalDemo';
+import BrowserMockupDemo from './BrowserMockupDemo';
 
 export default function Hero() {
   return (
@@ -25,32 +26,35 @@ export default function Hero() {
 
         {/* Tagline */}
         <p className="hero-sub">
-          Aeon finds its own vulnerabilities, patches them, and distributes
-          updates through a peer-to-peer network — with zero telemetry,
-          zero fingerprinting, and zero trust in anyone but you.
+          Aeon combines Brave-grade privacy shields and Chrome's sleek ergonomics with
+          an autonomous local AI agent pipe — 100% zero telemetry, zero fingerprinting,
+          and zero central servers.
         </p>
 
         {/* CTA buttons */}
         <div className="hero-actions">
           <a className="btn-primary" href="#waitlist" id="hero-download-btn">
-            Join the Waitlist
+            Download Aeon Pro
           </a>
           <a className="btn-secondary" href="#how-it-works">
-            See how it works →
+            Explore Architecture →
           </a>
         </div>
 
         {/* Sub-note with origin badge */}
-        <p className="hero-note">Free · No account required · Open source core</p>
+        <p className="hero-note">Free Community Edition · $29.99 One-Time Pro · Open source C++ core</p>
 
         {/* Feature pills */}
         <div className="hero-pills">
-          {['Local AI', 'P2P Updates', 'Zero Telemetry', 'Ed25519 Signed', '8 OS Tiers'].map((pill, i) => (
+          {['Brave Shield Guard', 'Chrome Ergonomics', 'Local MCP AI', 'P2P Updates', 'Zero Telemetry', 'Ed25519 Signed'].map((pill, i) => (
             <span className="hero-pill" key={i} style={{ animationDelay: `${0.6 + i * 0.08}s` }}>
               {pill}
             </span>
           ))}
         </div>
+
+        {/* Brave + Chrome Live Interactive Browser Mockup */}
+        <BrowserMockupDemo />
 
         {/* Live terminal demo */}
         <TerminalDemo />
