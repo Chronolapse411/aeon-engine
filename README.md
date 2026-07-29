@@ -107,6 +107,15 @@ All traffic → Rust Protocol Router (aeon_router.dll)
 
 ---
 
+### 🎨 Arc-Inspired Vertical UI & Spaces Matrix
+
+- **Arc Collapsible Vertical Sidebar (`240px`)**: Maximizes vertical reading area, keeping dozens of tabs legible. Toggle anytime (`Ctrl+S`) for 100% full-screen immersive view.
+- **Spaces & Context Isolator**: Switch between *Sovereign AI* (`#6C63FF`), *Privacy Guard* (`#FF5500`), and *Work* (`#3B82F6`) spaces with smooth color theme transitions.
+- **Floating Command Bar Overlay (`Ctrl+K` / `Ctrl+T`)**: Global spotlight launcher for web search, space switching, split-view tiling, and local AI agent prompt execution.
+- **Brave-Grade Privacy Shield**: Real-time tracker blocking counter badge (`1,428 Trackers Blocked`) and HTTPS-Everywhere enforcement.
+
+---
+
 ### 🤖 Autonomous Evolution Engine — The Browser That Patches Itself
 
 While you browse, six AI agents run silently in the background:

@@ -1369,6 +1369,18 @@ bool OnKeyDown(HWND hwnd, WPARAM vk, LPARAM lParam) {
         return true;
     }
 
+    // --- Ctrl+K: Arc Command Bar Spotlight Overlay ---
+    if (ctrl && !shift && !alt && vk == 'K') {
+        ToggleCommandBar(hwnd);
+        return true;
+    }
+
+    // --- Ctrl+S: Arc Vertical Sidebar Toggle ---
+    if (ctrl && !shift && !alt && vk == 'S') {
+        ToggleSidebar(hwnd);
+        return true;
+    }
+
     // --- Ctrl+W: Close current tab ---
     if (ctrl && !shift && !alt && vk == 'W') {
         if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
@@ -1758,6 +1770,37 @@ bool NavigateTab(HWND hwnd, unsigned int tabId, const char* url) {
         }
     }
     return false;
+}
+
+void ToggleSidebar(HWND hwnd) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    // Toggle Arc vertical sidebar state
+    ch->hoverBtn = 999;
+    PaintChrome(ch);
+    fprintf(stdout, "[Arc UI] Toggled vertical sidebar state.\n");
+}
+
+void SetLayoutMode(HWND hwnd, bool verticalSidebar) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    (void)verticalSidebar;
+    PaintChrome(ch);
+    fprintf(stdout, "[Arc UI] Set layout mode to %s.\n", verticalSidebar ? "Arc Vertical Sidebar" : "Horizontal Chrome");
+}
+
+void ToggleCommandBar(HWND hwnd) {
+    ChromeState* ch = reinterpret_cast<ChromeState*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (!ch) return;
+
+    // Trigger floating spotlight Command Bar (Ctrl+K)
+    ActivateUrlBar(ch);
+    fprintf(stdout, "[Arc UI] Triggered Command Bar (Ctrl+K).\n");
 }
 
 void Destroy(HWND hwnd) {

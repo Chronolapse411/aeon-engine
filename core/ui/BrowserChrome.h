@@ -76,6 +76,12 @@ namespace BrowserChrome {
 
     // Navigates the tab with the given engine tab_id to a URL.
     bool NavigateTab(HWND hwnd, unsigned int tabId, const char* url);
+
+    // ── Arc Vertical Sidebar & Command Bar API ──────────────────────────
+    // Controls layout switching, sidebar collapsing, and command overlay triggers.
+    void ToggleSidebar(HWND hwnd);
+    void SetLayoutMode(HWND hwnd, bool verticalSidebar);
+    void ToggleCommandBar(HWND hwnd);
 }
 
 // Agent IPC custom window message — dispatched by AeonAgentPipe
