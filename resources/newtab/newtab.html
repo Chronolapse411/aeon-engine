@@ -3,542 +3,462 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aeon Browser — Sovereign Arc Workstation</title>
+  <title>Aeon Browser — Windows 11 Sovereign Workstation</title>
   <style>
     /* =========================================================
-       WORLD-CLASS ARC BROWSER DESIGN SYSTEM & DESIGN TOKENS
+       WINDOWS 11 FLUENT DESIGN SYSTEM & DARK TOKENS
     ========================================================= */
     :root {
-      --bg-dark: #060810;
-      --bg-sidebar: #0b0d17;
-      --bg-card: #141728;
-      --bg-card-hover: #1b1e33;
-      --bg-card-active: #242845;
-      --accent-purple: #6c63ff;
-      --accent-glow: rgba(108, 99, 255, 0.4);
-      --brave-orange: #ff5500;
-      --work-blue: #3b82f6;
-      --text-white: #f0f2fc;
-      --text-muted: #8888aa;
-      --text-faint: #44445a;
-      --green-status: #22c55e;
-      --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-      --glass-border-accent: 1px solid rgba(108, 99, 255, 0.4);
-      --mono: 'JetBrains Mono', 'Consolas', monospace;
-      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --win11-bg: #090a10;
+      --win11-sidebar: #0f111a;
+      --win11-card: #161826;
+      --win11-card-hover: #1e2133;
+      --win11-accent: #6c63ff;
+      --win11-accent-hover: #7c75ff;
+      --win11-text: #f3f4f6;
+      --win11-muted: #9ca3af;
+      --win11-border: rgba(255, 255, 255, 0.08);
+      --win11-border-active: rgba(108, 99, 255, 0.4);
+      --font-segoe: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 100%; height: 100%;
-      background: var(--bg-dark);
-      color: var(--text-white);
-      font-family: var(--font);
+      background: var(--win11-bg);
+      color: var(--win11-text);
+      font-family: var(--font-segoe);
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Ambient Mesh Gradient Background */
+    /* Ambient Windows 11 Glow */
     body::before {
       content: '';
       position: absolute;
       inset: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(108, 99, 255, 0.15) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(255, 85, 0, 0.12) 0%, transparent 60%);
+      background: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(108, 99, 255, 0.18) 0%, transparent 70%);
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Full Window Arc Shell */
-    .arc-shell {
+    .app-shell {
       display: flex;
       width: 100vw;
       height: 100vh;
-      background: transparent;
       position: relative;
       z-index: 1;
     }
 
-    /* ── Collapsible Left Vertical Sidebar (260px) ── */
-    .arc-sidebar {
-      width: 260px;
+    /* ── Windows 11 Modern Vertical Sidebar (240px) ── */
+    .win-sidebar {
+      width: 240px;
       height: 100vh;
-      background: var(--bg-sidebar);
-      border-right: var(--glass-border);
-      padding: 14px 16px;
+      background: var(--win11-sidebar);
+      border-right: 1px solid var(--win11-border);
+      padding: 16px 12px;
       display: flex;
       flex-direction: column;
-      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 10;
       user-select: none;
-      backdrop-filter: blur(20px);
+      transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .arc-sidebar.collapsed {
-      width: 60px;
-      padding: 14px 10px;
+    .win-sidebar.collapsed {
+      width: 56px;
+      padding: 16px 8px;
       align-items: center;
     }
 
-    .sidebar-top-bar {
+    .sidebar-brand {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      padding: 0 4px;
     }
-    .traffic-lights {
-      display: flex;
-      gap: 8px;
-    }
-    .light-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      cursor: pointer;
-    }
-    .dot-red { background: #ff5f56; }
-    .dot-yellow { background: #ffbd2e; }
-    .dot-green { background: #27c93f; }
-
-    .brand-header {
+    .brand-logo-group {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-weight: 800;
+      font-weight: 700;
       font-size: 15px;
-      letter-spacing: 0.5px;
-      margin-bottom: 14px;
+      color: #ffffff;
     }
-    .brand-logo-badge {
-      width: 30px;
-      height: 30px;
-      border-radius: 9px;
+    .win11-logo-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
       background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 900;
+      font-weight: 800;
       color: #ffffff;
-      font-size: 15px;
-      box-shadow: 0 0 16px var(--accent-glow);
+      font-size: 14px;
     }
-    .brand-title { color: #ffffff; }
     .toggle-sidebar-btn {
       background: transparent;
       border: none;
-      color: var(--text-muted);
+      color: var(--win11-muted);
       font-size: 13px;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 6px;
       border-radius: 6px;
-      transition: all 0.2s;
+      transition: background 0.15s;
     }
     .toggle-sidebar-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
-    /* Pinned Favorites Row */
-    .pinned-row {
-      display: flex;
-      justify-content: space-around;
-      padding: 10px;
-      background: var(--bg-card);
-      border-radius: 12px;
-      border: var(--glass-border);
-      margin-bottom: 16px;
-    }
-    .pinned-tile {
-      font-size: 16px;
-      cursor: pointer;
-      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .pinned-tile:hover { transform: scale(1.3); }
-
-    /* Spaces Selector Matrix */
-    .section-label {
-      font-size: 10px;
-      font-weight: 800;
-      color: #666688;
-      letter-spacing: 1.2px;
-      display: block;
-      margin: 12px 0 8px 4px;
-    }
-
-    .spaces-list, .tabs-list {
-      display: flex;
-      flex-direction: column;
+    /* Action Tiles */
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
+      margin-bottom: 20px;
     }
-    .space-chip {
-      background: var(--bg-card);
-      border: var(--glass-border);
-      color: var(--text-muted);
-      padding: 9px 14px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 700;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .space-chip:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #ffffff;
-    }
-    .space-chip.active {
-      background: var(--space-color, var(--accent-purple));
-      color: #ffffff;
-      border-color: var(--space-color, var(--accent-purple));
-      box-shadow: 0 4px 16px rgba(108, 99, 255, 0.4);
-    }
-
-    /* Vertical Tab Cards */
-    .tab-card {
+    .action-tile {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--text-muted);
-      border: 1px solid transparent;
-      border-left: 4px solid transparent;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 13px;
+      justify-content: center;
+      height: 36px;
+      background: var(--win11-card);
+      border: 1px solid var(--win11-border);
+      border-radius: 8px;
+      font-size: 14px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
     }
-    .tab-card:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #ffffff;
+    .action-tile:hover {
+      background: var(--win11-card-hover);
+      border-color: var(--win11-accent);
+      transform: translateY(-1px);
     }
-    .tab-card.active {
-      background: var(--bg-card-hover);
-      color: #ffffff;
-      border-left-color: var(--accent-purple);
-      font-weight: 600;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-    }
-    .tab-close-icon { opacity: 0.4; font-size: 14px; }
-    .tab-close-icon:hover { opacity: 1; color: var(--brave-orange); }
 
-    .new-tab-button {
-      background: var(--bg-card);
-      border: 1px dashed var(--glass-border-accent);
-      color: var(--accent-purple);
-      padding: 10px;
-      border-radius: 10px;
-      font-size: 12px;
+    .section-header {
+      font-size: 11px;
       font-weight: 700;
-      cursor: pointer;
-      text-align: center;
-      margin-top: 8px;
-      transition: all 0.2s;
+      color: var(--win11-muted);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin: 12px 4px 8px;
     }
-    .new-tab-button:hover { background: rgba(108, 99, 255, 0.15); }
 
-    .sidebar-bottom-status {
-      margin-top: auto;
-      padding-top: 14px;
-      border-top: var(--glass-border);
+    /* Tabs List */
+    .tabs-container {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      font-size: 11px;
-      color: var(--green-status);
+    }
+    .tab-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: transparent;
+      border-radius: 8px;
+      color: var(--win11-muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #ffffff;
+    }
+    .tab-item.active {
+      background: var(--win11-card-hover);
+      color: #ffffff;
+      font-weight: 600;
+      border-left: 3px solid var(--win11-accent);
+    }
+    .tab-close-btn { opacity: 0.4; font-size: 13px; }
+    .tab-close-btn:hover { opacity: 1; color: #ef4444; }
+
+    .new-tab-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px;
+      background: var(--win11-card);
+      border: 1px dashed var(--win11-border);
+      border-radius: 8px;
+      color: var(--win11-accent);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.15s;
+    }
+    .new-tab-btn:hover { background: rgba(108, 99, 255, 0.12); border-color: var(--win11-accent); }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--win11-border);
+      font-size: 12px;
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    /* ── Right Main Area — Floating Web Content Canvas ── */
-    .arc-main-area {
+    /* ── Main Viewport Content Area ── */
+    .main-viewport {
       flex: 1;
       display: flex;
       flex-direction: column;
       height: 100vh;
-      padding: 12px;
+      background: var(--win11-bg);
+      padding: 8px 12px 12px;
+    }
+
+    /* Windows 11 Top Bar */
+    .top-address-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--win11-sidebar);
+      border: 1px solid var(--win11-border);
+      border-radius: 10px;
+      padding: 6px 14px;
+      margin-bottom: 8px;
+    }
+    .nav-arrow {
       background: transparent;
-    }
-
-    .floating-top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--bg-sidebar);
-      border: var(--glass-border);
-      border-radius: 14px;
-      padding: 8px 16px;
-      margin-bottom: 12px;
-    }
-
-    .url-pill-box {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex: 0.85;
-      background: var(--bg-card);
-      border: var(--glass-border-accent);
-      border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 13px;
-    }
-    .url-text-val { flex: 1; color: var(--text-white); font-family: var(--mono); margin: 0 10px; }
-    .shield-counter-badge {
-      background: rgba(255, 85, 0, 0.15);
-      border: 1px solid rgba(255, 85, 0, 0.4);
-      color: var(--brave-orange);
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 700;
+      border: none;
+      color: var(--win11-muted);
+      font-size: 15px;
       cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
     }
+    .nav-arrow:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
 
-    .canvas-card {
+    .url-input-field {
       flex: 1;
-      background: var(--bg-sidebar);
-      border: var(--glass-border);
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
-      overflow-y: auto;
+      background: var(--win11-card);
+      border: 1px solid var(--win11-border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #ffffff;
+      font-size: 13.5px;
+      outline: none;
+      font-family: inherit;
+    }
+    .url-input-field:focus { border-color: var(--win11-accent); }
+
+    /* Windows 11 Caption Controls */
+    .win11-caption-controls {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .caption-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--win11-muted);
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .caption-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .caption-btn.close:hover { background: #dc2626; color: #ffffff; }
+
+    /* Main Dashboard View */
+    .dashboard-canvas {
+      flex: 1;
+      background: var(--win11-sidebar);
+      border: 1px solid var(--win11-border);
+      border-radius: 12px;
+      padding: 40px 24px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      overflow-y: auto;
     }
 
-    .canvas-hero-title {
+    .dashboard-title {
       font-size: 32px;
-      font-weight: 900;
+      font-weight: 800;
       color: #ffffff;
       margin-bottom: 8px;
       letter-spacing: -0.5px;
-      text-align: center;
     }
-    .canvas-sub-title {
+    .dashboard-sub {
       font-size: 14px;
-      color: var(--text-muted);
-      margin-bottom: 28px;
-      text-align: center;
+      color: var(--win11-muted);
+      margin-bottom: 32px;
     }
 
-    .hero-search-wrapper {
+    .search-box-container {
       width: 100%;
-      max-width: 640px;
+      max-width: 600px;
       display: flex;
-      gap: 12px;
-      margin-bottom: 36px;
+      gap: 10px;
+      margin-bottom: 40px;
     }
-    .hero-search-input {
+    .big-search-input {
       flex: 1;
-      background: var(--bg-card);
-      border: var(--glass-border-accent);
-      border-radius: 16px;
-      padding: 18px 24px;
+      background: var(--win11-card);
+      border: 1px solid var(--win11-border-active);
+      border-radius: 12px;
+      padding: 16px 20px;
       color: #ffffff;
-      font-size: 16px;
+      font-size: 15px;
       outline: none;
       font-family: inherit;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px var(--accent-glow);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
-    .hero-search-btn {
-      background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
+    .big-search-btn {
+      background: var(--win11-accent);
       color: #ffffff;
       border: none;
-      padding: 0 28px;
-      border-radius: 16px;
-      font-weight: 800;
-      font-size: 15px;
+      padding: 0 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
       cursor: pointer;
-      box-shadow: 0 4px 16px var(--accent-glow);
-      transition: transform 0.15s ease;
+      transition: background 0.15s;
     }
-    .hero-search-btn:hover { transform: translateY(-2px); }
+    .big-search-btn:hover { background: var(--win11-accent-hover); }
 
-    /* Speed Dial Cards Matrix */
-    .speed-dial-grid {
+    /* Quick Links Grid */
+    .quick-links-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       width: 100%;
-      max-width: 720px;
-      margin-bottom: 36px;
+      max-width: 600px;
     }
-    .speed-card {
+    .link-card {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      background: var(--bg-card);
-      border: var(--glass-border);
-      border-radius: 14px;
-      padding: 16px 12px;
+      gap: 10px;
+      padding: 20px 16px;
+      background: var(--win11-card);
+      border: 1px solid var(--win11-border);
+      border-radius: 12px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
     }
-    .speed-card:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--accent-purple);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(108, 99, 255, 0.25);
+    .link-card:hover {
+      background: var(--win11-card-hover);
+      border-color: var(--win11-accent);
+      transform: translateY(-2px);
     }
-    .speed-icon { font-size: 24px; }
-    .speed-label { font-size: 12px; font-weight: 600; color: var(--text-white); }
-
-    /* Log Stream Panel */
-    .log-stream-panel {
-      width: 100%;
-      max-width: 720px;
-      background: var(--bg-dark);
-      border: var(--glass-border);
-      border-radius: 14px;
-      padding: 20px;
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.9;
-    }
-    .log-row { display: flex; gap: 14px; }
-    .log-timestamp { color: var(--text-muted); }
-    .log-content { color: var(--text-white); }
-
-    /* Spotlight Command Bar Overlay (Ctrl+K) */
-    .cmd-palette-backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(6, 8, 16, 0.85);
-      backdrop-filter: blur(24px);
-      z-index: 100;
-      display: none;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: 90px;
-    }
-    .cmd-palette-backdrop.active { display: flex; }
-    .cmd-palette-card {
-      width: 90%;
-      max-width: 640px;
-      background: var(--bg-sidebar);
-      border: var(--glass-border-accent);
-      border-radius: 20px;
-      padding: 20px;
-      box-shadow: 0 35px 100px rgba(0,0,0,0.9), 0 0 50px var(--accent-glow);
-    }
+    .link-icon { font-size: 24px; }
+    .link-name { font-size: 13px; font-weight: 600; color: var(--win11-text); }
   </style>
 </head>
 <body>
-  <div class="arc-shell">
-    <!-- 100% Pure Arc Vertical Sidebar -->
-    <div class="arc-sidebar" id="sidebar">
-      <div class="sidebar-top-bar">
-        <div class="traffic-lights">
-          <span class="light-dot dot-red"></span>
-          <span class="light-dot dot-yellow"></span>
-          <span class="light-dot dot-green"></span>
+  <div class="app-shell">
+    <!-- Windows 11 Modern Sidebar -->
+    <div class="win-sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo-group">
+          <div class="win11-logo-icon">A</div>
+          <span>Aeon Browser</span>
         </div>
         <button class="toggle-sidebar-btn" onclick="toggleSidebar()">◀</button>
       </div>
 
-      <div class="brand-header">
-        <div class="brand-logo-badge">A</div>
-        <span class="brand-title">AEON</span>
+      <div class="action-row">
+        <div class="action-tile" title="Search">🔍</div>
+        <div class="action-tile" title="Bookmarks">⭐</div>
+        <div class="action-tile" title="History">🕒</div>
+        <div class="action-tile" title="Settings">⚙️</div>
       </div>
 
-      <div class="pinned-row">
-        <span class="pinned-tile" title="Local Sovereign AI">⚡</span>
-        <span class="pinned-tile" title="Brave Privacy Shield">🛡️</span>
-        <span class="pinned-tile" title="GitHub Workstation">🐙</span>
-        <span class="pinned-tile" title="Settings Engine">⚙️</span>
-      </div>
-
-      <span class="section-label">SPACES</span>
-      <div class="spaces-list">
-        <button class="space-chip active" style="--space-color: #6c63ff" onclick="switchSpace('sovereign')">⚡ Sovereign AI</button>
-        <button class="space-chip" style="--space-color: #ff5500" onclick="switchSpace('privacy')">🛡️ Privacy Guard</button>
-        <button class="space-chip" style="--space-color: #3b82f6" onclick="switchSpace('work')">💼 DelgadoLogic Work</button>
-      </div>
-
-      <span class="section-label">TABS</span>
-      <div class="tabs-list">
-        <div class="tab-card active" onclick="selectTab(0)">
-          <span>⚡ Sovereign AI Agent</span>
-          <span class="tab-close-icon">×</span>
+      <div class="section-header">OPEN TABS</div>
+      <div class="tabs-container">
+        <div class="tab-item active" onclick="navUrl('aeon://newtab')">
+          <span>🌐 New Tab</span>
+          <span class="tab-close-btn">×</span>
         </div>
-        <div class="tab-card" onclick="selectTab(1)">
-          <span>🛡️ Brave Shield Guard</span>
-          <span class="tab-close-icon">×</span>
+        <div class="tab-item" onclick="navUrl('https://www.google.com')">
+          <span>🔍 Google</span>
+          <span class="tab-close-btn">×</span>
         </div>
-        <div class="tab-card" onclick="selectTab(2)">
-          <span>🌐 Sovereign P2P Network</span>
-          <span class="tab-close-icon">×</span>
+        <div class="tab-item" onclick="navUrl('https://github.com')">
+          <span>🐙 GitHub</span>
+          <span class="tab-close-btn">×</span>
         </div>
       </div>
-      <button class="new-tab-button" onclick="openCmdBar()">+ New Tab / Command (Ctrl+K)</button>
 
-      <div class="sidebar-bottom-status">
-        <span>🟢 Clearnet / DoH Active</span>
-        <span style="color: var(--text-muted)">RAM 1.2 GB · Local MCP Active</span>
+      <button class="new-tab-btn" onclick="navUrl('aeon://newtab')">+ New Tab</button>
+
+      <div class="sidebar-footer">
+        <span>🟢 Secure Clearnet Connection</span>
       </div>
     </div>
 
-    <!-- Main Floating Canvas Area -->
-    <div class="arc-main-area">
-      <div class="floating-top-bar">
-        <div class="url-pill-box">
-          <span>🔒</span>
-          <span class="url-text-val" id="urlDisplay">aeon://sovereign-agent</span>
-          <button class="shield-counter-badge">🛡️ 1,428</button>
-        </div>
-        <button class="toggle-sidebar-btn" style="padding: 6px 16px; font-weight:800; background: var(--bg-card);" onclick="openCmdBar()">⌘ Command Bar (Ctrl+K)</button>
-      </div>
+    <!-- Main Viewport -->
+    <div class="main-viewport">
+      <div class="top-address-bar">
+        <button class="nav-arrow">←</button>
+        <button class="nav-arrow">→</button>
+        <button class="nav-arrow">↻</button>
+        <input type="text" class="url-input-field" id="urlBar" value="aeon://newtab" onkeydown="handleUrlKey(event)" />
 
-      <div class="canvas-card">
-        <h1 class="canvas-hero-title">Sovereign AI Workstation</h1>
-        <p class="canvas-sub-title">Zero Telemetry Leaked · Local Rust Security Engine · Edge Compute</p>
-
-        <div class="hero-search-wrapper">
-          <input type="text" class="hero-search-input" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
-          <button class="hero-search-btn" onclick="executeSearch()">Search / Go</button>
-        </div>
-
-        <div class="speed-dial-grid">
-          <div class="speed-card" onclick="navUrl('https://www.google.com')">
-            <span class="speed-icon">🔍</span>
-            <span class="speed-label">Google</span>
-          </div>
-          <div class="speed-card" onclick="navUrl('https://github.com')">
-            <span class="speed-icon">🐙</span>
-            <span class="speed-label">GitHub</span>
-          </div>
-          <div class="speed-card" onclick="navUrl('https://news.ycombinator.com')">
-            <span class="speed-icon">🟧</span>
-            <span class="speed-label">HackerNews</span>
-          </div>
-          <div class="speed-card" onclick="navUrl('https://techcrunch.com')">
-            <span class="speed-icon">🟩</span>
-            <span class="speed-label">TechCrunch</span>
-          </div>
-          <div class="speed-card" onclick="navUrl('https://x.com')">
-            <span class="speed-icon">𝕏</span>
-            <span class="speed-label">X / Twitter</span>
-          </div>
-          <div class="speed-card" onclick="navUrl('https://chatgpt.com')">
-            <span class="speed-icon">🤖</span>
-            <span class="speed-label">ChatGPT</span>
-          </div>
-        </div>
-
-        <div class="log-stream-panel">
-          <div class="log-row"><span class="log-timestamp">08:25:10</span><span class="log-content">Connecting to local AeonWebMCP pipe...</span></div>
-          <div class="log-row"><span class="log-timestamp">08:25:14</span><span class="log-content">Parsing DOM snapshot with Rust tree serializer...</span></div>
-          <div class="log-row"><span class="log-timestamp">08:25:18</span><span class="log-content">Bypass tracker injected — 0 telemetry data leaked</span></div>
-          <div class="log-row"><span class="log-timestamp">08:25:22</span><span class="log-content">Autonomous task complete: 100% verified clean</span></div>
+        <!-- Windows 11 Caption Controls (Native Style) -->
+        <div class="win11-caption-controls">
+          <button class="caption-btn" title="Minimize">—</button>
+          <button class="caption-btn" title="Maximize">☐</button>
+          <button class="caption-btn close" title="Close">✕</button>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Spotlight Command Bar Modal (Ctrl+K) -->
-  <div class="cmd-palette-backdrop" id="cmdOverlay" onclick="closeCmdBar()">
-    <div class="cmd-palette-card" onclick="event.stopPropagation()">
-      <input type="text" class="hero-search-input" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
+      <div class="dashboard-canvas">
+        <h1 class="dashboard-title">Aeon Sovereign Workstation</h1>
+        <p class="dashboard-sub">Fast, Private, Sovereign Web Browsing for Windows 11</p>
+
+        <div class="search-box-container">
+          <input type="text" class="big-search-input" id="searchInput" placeholder="Search Google or type a web address..." onkeydown="handleSearchKey(event)" />
+          <button class="big-search-btn" onclick="executeSearch()">Search</button>
+        </div>
+
+        <div class="quick-links-grid">
+          <div class="link-card" onclick="navUrl('https://www.google.com')">
+            <span class="link-icon">🔍</span>
+            <span class="link-name">Google</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://github.com')">
+            <span class="link-icon">🐙</span>
+            <span class="link-name">GitHub</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://www.youtube.com')">
+            <span class="link-icon">▶️</span>
+            <span class="link-name">YouTube</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://news.ycombinator.com')">
+            <span class="link-icon">🟧</span>
+            <span class="link-name">Hacker News</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://www.wikipedia.org')">
+            <span class="link-icon">📚</span>
+            <span class="link-name">Wikipedia</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://x.com')">
+            <span class="link-icon">𝕏</span>
+            <span class="link-name">X / Twitter</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://www.amazon.com')">
+            <span class="link-icon">🛒</span>
+            <span class="link-name">Amazon</span>
+          </div>
+          <div class="link-card" onclick="navUrl('https://chatgpt.com')">
+            <span class="link-icon">🤖</span>
+            <span class="link-name">ChatGPT</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -546,41 +466,24 @@
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('collapsed');
     }
-    function openCmdBar() {
-      document.getElementById('cmdOverlay').classList.add('active');
-      document.getElementById('cmdInput').focus();
-    }
-    function closeCmdBar() {
-      document.getElementById('cmdOverlay').classList.remove('active');
-    }
-    function handleCmdKey(e) {
-      if (e.key === 'Escape') closeCmdBar();
-      if (e.key === 'Enter') {
-        const val = document.getElementById('cmdInput').value;
-        if (val) {
-          navUrl(val);
-          closeCmdBar();
-        }
-      }
-    }
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        openCmdBar();
-      }
-    });
-    function selectTab(idx) {
-      const titles = ['Autonomous Web Intelligence Workstation', 'Brave-Grade Privacy Shield Matrix', 'Decentralized P2P Patch Network'];
-      const urls = ['aeon://sovereign-agent', 'aeon://shield-statistics', 'aeon://p2p-mesh'];
-      document.getElementById('urlDisplay').innerText = urls[idx];
-      const tabs = document.querySelectorAll('.tab-card');
-      tabs.forEach((t, i) => t.classList.toggle('active', i === idx));
-    }
     function navUrl(url) {
       if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('aeon://')) {
         url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
       }
-      document.getElementById('urlDisplay').innerText = url;
+      document.getElementById('urlBar').value = url;
+      if (url.startsWith('http')) {
+        window.location.href = url;
+      }
+    }
+    function handleUrlKey(e) {
+      if (e.key === 'Enter') {
+        navUrl(document.getElementById('urlBar').value);
+      }
+    }
+    function handleSearchKey(e) {
+      if (e.key === 'Enter') {
+        executeSearch();
+      }
     }
     function executeSearch() {
       const q = document.getElementById('searchInput').value;
