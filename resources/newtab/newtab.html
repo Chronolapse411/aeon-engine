@@ -6,24 +6,24 @@
   <title>Aeon Browser — Sovereign Arc Workstation</title>
   <style>
     /* =========================================================
-       PURE ARC BROWSER DESIGN SYSTEM & DESIGN TOKENS
+       WORLD-CLASS ARC BROWSER DESIGN SYSTEM & DESIGN TOKENS
     ========================================================= */
     :root {
-      --bg-base: #06070b;
+      --bg-dark: #060810;
       --bg-sidebar: #0b0d17;
-      --bg-card: #141727;
-      --bg-card-hover: #1c2035;
-      --bg-card-active: #242944;
-      --accent: #6c63ff;
-      --accent-glow: rgba(108, 99, 255, 0.35);
+      --bg-card: #141728;
+      --bg-card-hover: #1b1e33;
+      --bg-card-active: #242845;
+      --accent-purple: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.4);
       --brave-orange: #ff5500;
       --work-blue: #3b82f6;
-      --text-primary: #f0f2fc;
+      --text-white: #f0f2fc;
       --text-muted: #8888aa;
       --text-faint: #44445a;
       --green-status: #22c55e;
       --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-      --glass-border-active: 1px solid rgba(108, 99, 255, 0.4);
+      --glass-border-accent: 1px solid rgba(108, 99, 255, 0.4);
       --mono: 'JetBrains Mono', 'Consolas', monospace;
       --font: 'Inter', system-ui, -apple-system, sans-serif;
     }
@@ -32,23 +32,36 @@
 
     html, body {
       width: 100%; height: 100%;
-      background: var(--bg-base);
-      color: var(--text-primary);
+      background: var(--bg-dark);
+      color: var(--text-white);
       font-family: var(--font);
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Full Window Arc Workstation Shell */
+    /* Ambient Mesh Gradient Background */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(108, 99, 255, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 90%, rgba(255, 85, 0, 0.12) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Full Window Arc Shell */
     .arc-shell {
       display: flex;
       width: 100vw;
       height: 100vh;
-      background: var(--bg-base);
+      background: transparent;
       position: relative;
+      z-index: 1;
     }
 
-    /* ── Pure Arc Vertical Sidebar (260px) ── */
+    /* ── Collapsible Left Vertical Sidebar (260px) ── */
     .arc-sidebar {
       width: 260px;
       height: 100vh;
@@ -60,6 +73,7 @@
       transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 10;
       user-select: none;
+      backdrop-filter: blur(20px);
     }
     .arc-sidebar.collapsed {
       width: 60px;
@@ -67,7 +81,6 @@
       align-items: center;
     }
 
-    /* Top Sidebar Controls — Window Traffic Lights + Workspace Header */
     .sidebar-top-bar {
       display: flex;
       align-items: center;
@@ -173,9 +186,9 @@
       color: #ffffff;
     }
     .space-chip.active {
-      background: var(--space-color, var(--accent));
+      background: var(--space-color, var(--accent-purple));
       color: #ffffff;
-      border-color: var(--space-color, var(--accent));
+      border-color: var(--space-color, var(--accent-purple));
       box-shadow: 0 4px 16px rgba(108, 99, 255, 0.4);
     }
 
@@ -201,7 +214,7 @@
     .tab-card.active {
       background: var(--bg-card-hover);
       color: #ffffff;
-      border-left-color: var(--accent);
+      border-left-color: var(--accent-purple);
       font-weight: 600;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     }
@@ -210,8 +223,8 @@
 
     .new-tab-button {
       background: var(--bg-card);
-      border: 1px dashed var(--glass-border-active);
-      color: var(--accent);
+      border: 1px dashed var(--glass-border-accent);
+      color: var(--accent-purple);
       padding: 10px;
       border-radius: 10px;
       font-size: 12px;
@@ -240,8 +253,8 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
-      padding: 10px;
-      background: var(--bg-base);
+      padding: 12px;
+      background: transparent;
     }
 
     .floating-top-bar {
@@ -252,7 +265,7 @@
       border: var(--glass-border);
       border-radius: 14px;
       padding: 8px 16px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .url-pill-box {
@@ -261,12 +274,12 @@
       justify-content: space-between;
       flex: 0.85;
       background: var(--bg-card);
-      border: var(--glass-border-active);
+      border: var(--glass-border-accent);
       border-radius: 20px;
       padding: 6px 16px;
       font-size: 13px;
     }
-    .url-text-val { flex: 1; color: var(--text-primary); font-family: var(--mono); margin: 0 10px; }
+    .url-text-val { flex: 1; color: var(--text-white); font-family: var(--mono); margin: 0 10px; }
     .shield-counter-badge {
       background: rgba(255, 85, 0, 0.15);
       border: 1px solid rgba(255, 85, 0, 0.4);
@@ -283,74 +296,115 @@
       background: var(--bg-sidebar);
       border: var(--glass-border);
       border-radius: 16px;
-      padding: 24px;
+      padding: 32px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
       overflow-y: auto;
-    }
-    .canvas-header {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 24px;
+      flex-direction: column;
+      align-items: center;
     }
-    .status-badge {
-      display: inline-block;
-      background: rgba(108, 99, 255, 0.15);
-      color: var(--accent);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 6px;
-      margin-bottom: 8px;
-    }
-    .h1-headline { font-size: 26px; font-weight: 800; color: #ffffff; }
 
-    .search-input-group {
+    .canvas-hero-title {
+      font-size: 32px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+      text-align: center;
+    }
+    .canvas-sub-title {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .hero-search-wrapper {
+      width: 100%;
+      max-width: 640px;
       display: flex;
       gap: 12px;
-      margin: 24px 0;
+      margin-bottom: 36px;
     }
-    .search-input-field {
+    .hero-search-input {
       flex: 1;
       background: var(--bg-card);
-      border: var(--glass-border-active);
-      border-radius: 14px;
-      padding: 16px 20px;
+      border: var(--glass-border-accent);
+      border-radius: 16px;
+      padding: 18px 24px;
       color: #ffffff;
-      font-size: 15px;
+      font-size: 16px;
       outline: none;
       font-family: inherit;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px var(--accent-glow);
     }
-    .search-action-btn {
+    .hero-search-btn {
       background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
       color: #ffffff;
       border: none;
       padding: 0 28px;
-      border-radius: 14px;
+      border-radius: 16px;
       font-weight: 800;
-      font-size: 14px;
+      font-size: 15px;
       cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow);
+      transition: transform 0.15s ease;
     }
+    .hero-search-btn:hover { transform: translateY(-2px); }
 
-    .log-stream-console {
-      background: var(--bg-base);
+    /* Speed Dial Cards Matrix */
+    .speed-dial-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 36px;
+    }
+    .speed-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--bg-card);
       border: var(--glass-border);
-      border-radius: 12px;
-      padding: 18px;
+      border-radius: 14px;
+      padding: 16px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .speed-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-purple);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(108, 99, 255, 0.25);
+    }
+    .speed-icon { font-size: 24px; }
+    .speed-label { font-size: 12px; font-weight: 600; color: var(--text-white); }
+
+    /* Log Stream Panel */
+    .log-stream-panel {
+      width: 100%;
+      max-width: 720px;
+      background: var(--bg-dark);
+      border: var(--glass-border);
+      border-radius: 14px;
+      padding: 20px;
       font-family: var(--mono);
       font-size: 13px;
       line-height: 1.9;
     }
     .log-row { display: flex; gap: 14px; }
     .log-timestamp { color: var(--text-muted); }
-    .log-content { color: var(--text-primary); }
+    .log-content { color: var(--text-white); }
 
     /* Spotlight Command Bar Overlay (Ctrl+K) */
     .cmd-palette-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(6, 7, 11, 0.85);
-      backdrop-filter: blur(20px);
+      background: rgba(6, 8, 16, 0.85);
+      backdrop-filter: blur(24px);
       z-index: 100;
       display: none;
       align-items: flex-start;
@@ -362,9 +416,9 @@
       width: 90%;
       max-width: 640px;
       background: var(--bg-sidebar);
-      border: var(--glass-border-active);
-      border-radius: 18px;
-      padding: 18px;
+      border: var(--glass-border-accent);
+      border-radius: 20px;
+      padding: 20px;
       box-shadow: 0 35px 100px rgba(0,0,0,0.9), 0 0 50px var(--accent-glow);
     }
   </style>
@@ -424,7 +478,7 @@
       </div>
     </div>
 
-    <!-- Main Floating Web Viewport Canvas -->
+    <!-- Main Floating Canvas Area -->
     <div class="arc-main-area">
       <div class="floating-top-bar">
         <div class="url-pill-box">
@@ -436,19 +490,42 @@
       </div>
 
       <div class="canvas-card">
-        <div class="canvas-header">
-          <div>
-            <span class="status-badge" id="statusTag">Local MCP Pipeline Active</span>
-            <h1 class="h1-headline" id="cardTitle">Autonomous Web Intelligence Workstation</h1>
+        <h1 class="canvas-hero-title">Sovereign AI Workstation</h1>
+        <p class="canvas-sub-title">Zero Telemetry Leaked · Local Rust Security Engine · Edge Compute</p>
+
+        <div class="hero-search-wrapper">
+          <input type="text" class="hero-search-input" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
+          <button class="hero-search-btn" onclick="executeSearch()">Search / Go</button>
+        </div>
+
+        <div class="speed-dial-grid">
+          <div class="speed-card" onclick="navUrl('https://www.google.com')">
+            <span class="speed-icon">🔍</span>
+            <span class="speed-label">Google</span>
+          </div>
+          <div class="speed-card" onclick="navUrl('https://github.com')">
+            <span class="speed-icon">🐙</span>
+            <span class="speed-label">GitHub</span>
+          </div>
+          <div class="speed-card" onclick="navUrl('https://news.ycombinator.com')">
+            <span class="speed-icon">🟧</span>
+            <span class="speed-label">HackerNews</span>
+          </div>
+          <div class="speed-card" onclick="navUrl('https://techcrunch.com')">
+            <span class="speed-icon">🟩</span>
+            <span class="speed-label">TechCrunch</span>
+          </div>
+          <div class="speed-card" onclick="navUrl('https://x.com')">
+            <span class="speed-icon">𝕏</span>
+            <span class="speed-label">X / Twitter</span>
+          </div>
+          <div class="speed-card" onclick="navUrl('https://chatgpt.com')">
+            <span class="speed-icon">🤖</span>
+            <span class="speed-label">ChatGPT</span>
           </div>
         </div>
 
-        <div class="search-input-group">
-          <input type="text" class="search-input-field" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
-          <button class="search-action-btn" onclick="executeSearch()">Search / Go</button>
-        </div>
-
-        <div class="log-stream-console">
+        <div class="log-stream-panel">
           <div class="log-row"><span class="log-timestamp">08:25:10</span><span class="log-content">Connecting to local AeonWebMCP pipe...</span></div>
           <div class="log-row"><span class="log-timestamp">08:25:14</span><span class="log-content">Parsing DOM snapshot with Rust tree serializer...</span></div>
           <div class="log-row"><span class="log-timestamp">08:25:18</span><span class="log-content">Bypass tracker injected — 0 telemetry data leaked</span></div>
@@ -461,7 +538,7 @@
   <!-- Spotlight Command Bar Modal (Ctrl+K) -->
   <div class="cmd-palette-backdrop" id="cmdOverlay" onclick="closeCmdBar()">
     <div class="cmd-palette-card" onclick="event.stopPropagation()">
-      <input type="text" class="search-input-field" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
+      <input type="text" class="hero-search-input" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
     </div>
   </div>
 
@@ -481,8 +558,7 @@
       if (e.key === 'Enter') {
         const val = document.getElementById('cmdInput').value;
         if (val) {
-          document.getElementById('urlDisplay').innerText = val;
-          document.getElementById('cardTitle').innerText = 'Navigated: ' + val;
+          navUrl(val);
           closeCmdBar();
         }
       }
@@ -496,17 +572,19 @@
     function selectTab(idx) {
       const titles = ['Autonomous Web Intelligence Workstation', 'Brave-Grade Privacy Shield Matrix', 'Decentralized P2P Patch Network'];
       const urls = ['aeon://sovereign-agent', 'aeon://shield-statistics', 'aeon://p2p-mesh'];
-      document.getElementById('cardTitle').innerText = titles[idx];
       document.getElementById('urlDisplay').innerText = urls[idx];
       const tabs = document.querySelectorAll('.tab-card');
       tabs.forEach((t, i) => t.classList.toggle('active', i === idx));
     }
+    function navUrl(url) {
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('aeon://')) {
+        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+      }
+      document.getElementById('urlDisplay').innerText = url;
+    }
     function executeSearch() {
       const q = document.getElementById('searchInput').value;
-      if (q) {
-        document.getElementById('urlDisplay').innerText = 'https://www.google.com/search?q=' + encodeURIComponent(q);
-        document.getElementById('cardTitle').innerText = 'Search Results for: "' + q + '"';
-      }
+      if (q) navUrl(q);
     }
   </script>
 </body>

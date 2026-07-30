@@ -531,22 +531,9 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 if (pt.x > rc.right - BORDER) return HTRIGHT;
             }
 
-            // Nav bar area (y < 40): check if over a button
-            if (pt.y < 40) {
-                int chromeHit = BrowserChrome::HitTest(hWnd, pt.x, pt.y);
-                if (chromeHit >= 0) {
-                    // Over a clickable button → let WM_LBUTTONDOWN handle it
-                    return HTCLIENT;
-                }
-                // Empty nav bar area → draggable caption
+            // Top 30px sidebar header area (except over Webview controls) = draggable caption
+            if (pt.y < 30 && pt.x < 260) {
                 return HTCAPTION;
-            }
-
-            // Tab strip area (40-72): also check for tab clicks
-            if (pt.y < 72) {
-                int chromeHit = BrowserChrome::HitTest(hWnd, pt.x, pt.y);
-                if (chromeHit >= 0) return HTCLIENT;
-                return HTCAPTION; // Empty tab strip area = also draggable
             }
 
             return HTCLIENT;
