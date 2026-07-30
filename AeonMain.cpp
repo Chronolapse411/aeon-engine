@@ -563,6 +563,11 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             BrowserChrome::OnMouseMove(hWnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
 
+        case WM_AEON_AGENT: {
+            AeonAgentPipe::HandleCommand(wParam, lParam);
+            return 0;
+        }
+
         case WM_AEONBRIDGE: {
             if ((int)wParam == BRIDGE_CMD_NAVIGATE) {
                 char* url = reinterpret_cast<char*>(lParam);
@@ -586,11 +591,6 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         case WM_COMMAND:
             BrowserChrome::OnCommand(hWnd, LOWORD(wParam), HIWORD(wParam),
                 reinterpret_cast<HWND>(lParam));
-            return 0;
-
-        // ── Agent pipe command dispatch ─────────────────────────────────
-        case WM_AEON_AGENT:
-            AeonAgentPipe::HandleCommand(wParam, lParam);
             return 0;
 
         // ── Loading animation timer → repaint tab strip ──────────────────

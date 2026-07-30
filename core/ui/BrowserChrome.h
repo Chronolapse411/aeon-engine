@@ -85,5 +85,5 @@ namespace BrowserChrome {
 }
 
 // Agent IPC custom window message — dispatched by AeonAgentPipe
-#define WM_AEON_AGENT (WM_USER + 0x7AF)
+#define WM_AEON_AGENT (WM_USER + 0x7B0)
 

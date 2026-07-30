@@ -349,35 +349,36 @@ static std::string BuildBrowserInfoJson() {
 // ── Pipe thread ──────────────────────────────────────────────────────
 
 static void PipeThread() {
-    fprintf(stdout, "[AgentPipe] Starting on \\\\.\\pipe\\aeon-agent ...\n");
+    FILE* fLog = nullptr;
+    fopen_s(&fLog, "pipe_debug.log", "a");
+    if (fLog) { fprintf(fLog, "[AgentPipe] PipeThread launched.\n"); fclose(fLog); }
 
-    // LOCAL_ONLY security descriptor — only current user on localhost
     PSECURITY_DESCRIPTOR pSD = nullptr;
     SECURITY_ATTRIBUTES sa = {};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = FALSE;
-
-    if (ConvertStringSecurityDescriptorToSecurityDescriptorA(
-            "D:(A;;GRGW;;;WD)", SDDL_REVISION_1, &pSD, nullptr)) {
-        sa.lpSecurityDescriptor = pSD;
-    }
+    sa.lpSecurityDescriptor = nullptr;
 
     while (!s_stopRequest) {
         s_pipe = CreateNamedPipeW(
             PIPE_NAME,
             PIPE_ACCESS_DUPLEX,
-            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
-                PIPE_REJECT_REMOTE_CLIENTS,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
             PIPE_UNLIMITED_INSTANCES,
             PIPE_BUFSIZE, PIPE_BUFSIZE,
             0,
-            pSD ? &sa : nullptr);
+            nullptr);
 
         if (s_pipe == INVALID_HANDLE_VALUE) {
-            fprintf(stderr, "[AgentPipe] CreateNamedPipe failed: %lu\n",
-                    GetLastError());
-            break;
+            DWORD err = GetLastError();
+            fopen_s(&fLog, "pipe_debug.log", "a");
+            if (fLog) { fprintf(fLog, "[AgentPipe] CreateNamedPipe failed: %lu (retrying)\n", err); fclose(fLog); }
+            Sleep(100);
+            continue;
         }
+
+        fopen_s(&fLog, "pipe_debug.log", "a");
+        if (fLog) { fprintf(fLog, "[AgentPipe] CreateNamedPipe SUCCESS, waiting for client...\n"); fclose(fLog); }
 
         // Block until a client connects (or stop is requested)
         BOOL connected = ConnectNamedPipe(s_pipe, nullptr)
