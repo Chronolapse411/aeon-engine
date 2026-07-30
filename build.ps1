@@ -224,9 +224,10 @@ $resItems = @(
 foreach ($item in $resItems) {
     $src = "$Root\$item"
     if (Test-Path $src) {
-        $destSubDir = "$publishDir\" + (Split-Path (Split-Path $item -Parent) -Leaf)
+        $destFile = "$publishDir\$item"
+        $destSubDir = Split-Path $destFile -Parent
         New-Item -ItemType Directory -Force -Path $destSubDir | Out-Null
-        Copy-Item $src $destSubDir -Force
+        Copy-Item $src $destFile -Force
         OK "Copied: $item"
     }
 }
