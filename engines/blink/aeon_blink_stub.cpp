@@ -115,10 +115,18 @@ static std::string ResolveAeonUrl(const std::string& url) {
     char path[MAX_PATH];
     if (page == "newtab") {
         _snprintf_s(path, sizeof(path), _TRUNCATE,
-            "%s\\newtab\\newtab.html", g_ExeDir);
+            "%s\\resources\\newtab\\newtab.html", g_ExeDir);
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+            _snprintf_s(path, sizeof(path), _TRUNCATE,
+                "%s\\newtab\\newtab.html", g_ExeDir);
+        }
     } else {
         _snprintf_s(path, sizeof(path), _TRUNCATE,
-            "%s\\pages\\%s.html", g_ExeDir, page.c_str());
+            "%s\\resources\\%s\\%s.html", g_ExeDir, page.c_str(), page.c_str());
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+            _snprintf_s(path, sizeof(path), _TRUNCATE,
+                "%s\\pages\\%s.html", g_ExeDir, page.c_str());
+        }
     }
 
     // Verify file exists
