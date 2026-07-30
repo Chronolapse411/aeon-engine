@@ -453,8 +453,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     ShowWindow(hWnd, nShowCmd);
     UpdateWindow(hWnd);
 
-    // 9c. Restore previous session tabs (after window is visible)
-    SessionManager::RestorePreviousSession();
+    // 9c. Start fresh on new tab page (session restore disabled for clean boot)
+    // SessionManager::RestorePreviousSession();
 
     fprintf(stdout, "[Boot] Ready.\n\n");
 
