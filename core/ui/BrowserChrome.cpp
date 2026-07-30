@@ -100,9 +100,9 @@ extern AeonJourneyAnalytics* g_JourneyAI;
 #define CLR_GREEN        RGB(34,  197, 94)   // #22c55e
 
 // Chrome dimensions (pixels)
-static const int NAV_HEIGHT  = 40;  // titlebar + navigation row
-static const int TAB_HEIGHT  = 32;  // tab strip
-static const int CHROME_H    = NAV_HEIGHT + TAB_HEIGHT; // 72px total chrome
+static const int NAV_HEIGHT  = 0;
+static const int TAB_HEIGHT  = 0;
+static const int CHROME_H    = 0; // Pure Webview UI canvas (0px GDI header)
 
 // Button zones (nav bar, from left)
 static const int BTN_LOGO_X  = 8;   static const int BTN_LOGO_W  = 36;
