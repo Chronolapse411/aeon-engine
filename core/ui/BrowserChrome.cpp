@@ -317,12 +317,7 @@ static void DrawLogoBadge(HDC hdc, int x, int y, HFONT hLogoFont) {
             RGB(167, 139, 250)  // #a78bfa bottom
         };
         int bandH = SIZE / 4;
-        for (int i = 0; i < 4; i++) {
-            RECT band = { x, y + i * bandH, x + SIZE, y + (i + 1) * bandH };
-            if (i == 0) band.top += 1;  // rounded top visual offset
-            FillRectColor(hdc, band, gradColors[i]);
-        }
-
+        
         // Rounded corners via clipping region
         HRGN rgn = CreateRoundRectRgn(x, y, x + SIZE + 1, y + SIZE + 1, 8, 8);
         SelectClipRgn(hdc, rgn);
@@ -354,172 +349,144 @@ static void DrawLogoBadge(HDC hdc, int x, int y, HFONT hLogoFont) {
 }
 
 // ---------------------------------------------------------------------------
-// Paint nav bar (back/fwd/refresh + URL bar + right icons)
+// Arc Vertical Sidebar Layout Renderer
+// Renders collapsible vertical sidebar (240px) on the left containing spaces,
+// vertical tabs, floating command bar, and bottom status bar.
 // ---------------------------------------------------------------------------
-static void PaintNavBar(ChromeState* ch, HDC hdc, int width) {
-    // Nav bar background
-    RECT navR = { 0, 0, width, NAV_HEIGHT };
-    FillRectColor(hdc, navR, CLR_BG_PRIMARY);
+static const int SIDEBAR_WIDTH = 240;
 
-    // "A" logo badge — top-left, vertically centered
-    DrawLogoBadge(hdc, BTN_LOGO_X, (NAV_HEIGHT - 28) / 2, ch->hLogoFont);
+static void PaintArcVerticalSidebar(ChromeState* ch, HDC hdc, int height) {
+    // 1. Sidebar Background (#0B0D17)
+    RECT sideR = { 0, 0, SIDEBAR_WIDTH, height };
+    FillRectColor(hdc, sideR, CLR_BG_PRIMARY);
 
-    int urlRight = width - URLBAR_END;
+    // Right border separator line (#1E223D)
+    RECT borderR = { SIDEBAR_WIDTH - 1, 0, SIDEBAR_WIDTH, height };
+    FillRectColor(hdc, borderR, CLR_BG_ACTIVE);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
-    // Draw unified glassmorphic card container with subtle violet glowing outlines
-    {
-        Gdiplus::GraphicsPath path;
-        int r = 12; // radius
-        int xL = BTN_BACK_X - 6; // 46
-        int yT = 3;
-        int wC = (urlRight + 6) - xL;
-        int hC = (NAV_HEIGHT - 3) - yT; // 34px height
+    // 2. Top Header — Logo badge + "AEON" + Collapse button
+    DrawLogoBadge(hdc, 12, 12, ch->hLogoFont);
+    RECT titleR = { 46, 12, 160, 40 };
+    DrawText16(hdc, "AEON", titleR, CLR_TEXT, ch->hTextBold);
 
-        // Create a rounded rectangle path
-        path.AddArc((float)xL, (float)yT, (float)r, (float)r, 180, 90);
-        path.AddArc((float)(xL + wC - r), (float)yT, (float)r, (float)r, 270, 90);
-        path.AddArc((float)(xL + wC - r), (float)(yT + hC - r), (float)r, (float)r, 0, 90);
-        path.AddArc((float)xL, (float)(yT + hC - r), (float)r, (float)r, 90, 90);
-        path.CloseFigure();
-
-        // Fill with semi-transparent dark background for glassmorphic card effect
-        Gdiplus::SolidBrush fillBrush(Gdiplus::Color(200, 22, 24, 42)); // glassmorphic bg
-        graphics.FillPath(&fillBrush, &path);
-
-        // Outline with a subtle violet glowing border
-        Gdiplus::Pen borderPen(Gdiplus::Color(120, 167, 139, 250), 1.0f); // subtle violet glow outline
-        graphics.DrawPath(&borderPen, &path);
-    }
-
-    // Determine back/forward availability from tab history stack
-    bool canGoBack = false, canGoForward = false;
-    if (ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
-        const auto& t = ch->tabs[ch->activeTab];
-        canGoBack = (t.historyIndex > 0);
-        canGoForward = (t.historyIndex < (int)t.history.size() - 1);
-    }
-
-    // Nav buttons: ← → ↻  (flat icons, no card borders — modern browser style)
-    // Back and Forward dim to text-faint when unavailable
-    struct { int x; const wchar_t* icon; bool enabled; int id; } navBtns[] = {
-        { BTN_BACK_X, ICON_BACK,    canGoBack, 1 },
-        { BTN_FWD_X,  ICON_FORWARD, canGoForward, 2 },
-        { BTN_REF_X,  ICON_REFRESH, true, 3 }
+    // Header action icons: AI (⚡), Shield (🛡️), Downloads (⬇️)
+    struct HeaderIcon { int x; const wchar_t* glyph; COLORREF color; int id; };
+    HeaderIcon hIcons[] = {
+        { 150, ICON_AI_SUMMARY, CLR_ACCENT,    30 },
+        { 172, ICON_SHIELD,     CLR_BRAVE_ORANGE, 31 },
+        { 194, ICON_DOWNLOAD,   CLR_TEXT_DIM,  32 }
     };
-    for (int bi = 0; bi < 3; bi++) {
-        auto& b = navBtns[bi];
-        RECT br = { b.x, 4, b.x + BTN_BACK_W, NAV_HEIGHT - 4 };
-        double alpha = ch->hoverAlphas[b.id];
-        if (alpha > 0.0 && b.enabled) {
-            Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(alpha * 40.0), 255, 255, 255));
-            FillGdiplusRoundRect(graphics, br, 6, hoverBrush);
-        }
-        COLORREF baseColor = !b.enabled ? CLR_TEXT_FAINT : CLR_TEXT_DIM;
-        COLORREF hoverColor = CLR_TEXT;
-        BYTE rIcon = (BYTE)( (1.0 - alpha) * GetRValue(baseColor) + alpha * GetRValue(hoverColor) );
-        BYTE gIcon = (BYTE)( (1.0 - alpha) * GetGValue(baseColor) + alpha * GetGValue(hoverColor) );
-        BYTE bIcon = (BYTE)( (1.0 - alpha) * GetBValue(baseColor) + alpha * GetBValue(hoverColor) );
-        DrawIcon(hdc, b.icon, br, RGB(rIcon, gIcon, bIcon), ch->hIconFont);
+    for (const auto& hi : hIcons) {
+        RECT ir = { hi.x, 14, hi.x + 20, 34 };
+        DrawIcon(hdc, hi.glyph, ir, hi.color, ch->hIconFontSmall);
     }
 
-    // URL bar
-    int urlLeft  = URLBAR_PAD;
-    RECT urlR = { urlLeft, 6, urlRight, NAV_HEIGHT - 6 };
-    COLORREF urlBorder = ch->urlFocused ? CLR_ACCENT : RGB(30, 33, 50);
-    DrawRoundRect(hdc, urlR, 12, CLR_BG_CARD, urlBorder);
+    // 3. Floating Omnibox / Command Bar Launcher (Ctrl+K)
+    RECT urlBoxR = { 12, 48, 228, 80 };
+    COLORREF urlBorder = ch->urlFocused ? CLR_ACCENT : CLR_BG_ACTIVE;
+    DrawRoundRect(hdc, urlBoxR, 10, CLR_BG_CARD, urlBorder);
 
-    // Lock icon — proper MDL2 lock glyph with dynamic DPI padding
-    HDC hdcTemp = GetDC(ch->hwnd);
-    int dpiY = GetDeviceCaps(hdcTemp, LOGPIXELSY);
-    ReleaseDC(ch->hwnd, hdcTemp);
-    int padX = MulDiv(6, dpiY, 72);
-    RECT lockR = { urlLeft + padX, 6, urlLeft + padX + 18, NAV_HEIGHT - 6 };
+    // Lock icon
+    RECT lockR = { 20, 54, 36, 74 };
     DrawIcon(hdc, ICON_LOCK, lockR, CLR_GREEN, ch->hIconFontSmall);
 
-    // URL text with breathing 10px gap from lock icon
-    const char* urlTxt = "about:blank";
-    if (!ch->tabs.empty() && ch->activeTab >= 0 &&
-        ch->activeTab < (int)ch->tabs.size()) {
-        const auto& t = ch->tabs[ch->activeTab];
-        urlTxt = t.url.c_str();
+    // Active URL text
+    const char* urlTxt = "aeon://sovereign-agent";
+    if (!ch->tabs.empty() && ch->activeTab >= 0 && ch->activeTab < (int)ch->tabs.size()) {
+        urlTxt = ch->tabs[ch->activeTab].url.c_str();
     }
-    RECT urlTextR = { urlLeft + padX + 28, 6, urlRight - 32, NAV_HEIGHT - 6 };
+    RECT urlTextR = { 38, 54, 168, 74 };
     DrawText16(hdc, urlTxt, urlTextR, CLR_TEXT, ch->hTextFont);
 
-    // AdBlock shield — small green dot indicator
-    HBRUSH shieldB = CreateSolidBrush(CLR_GREEN);
-    RECT shieldR = { urlRight - 24, 16, urlRight - 17, 23 };
-    HRGN shieldRgn = CreateEllipticRgn(shieldR.left, shieldR.top,
-        shieldR.right, shieldR.bottom);
-    FillRgn(hdc, shieldRgn, shieldB);
-    DeleteObject(shieldRgn);
-    DeleteObject(shieldB);
+    // Brave Privacy Shield badge (1,428 in orange)
+    RECT shieldBadgeR = { 172, 53, 222, 75 };
+    DrawRoundRect(hdc, shieldBadgeR, 6, CLR_BRAVE_ORANGE, CLR_BRAVE_ORANGE);
+    RECT shieldTextR = { 172, 53, 222, 75 };
+    DrawText16(hdc, "🛡️ 1.4k", shieldTextR, RGB(255, 255, 255), ch->hTextTabFont);
 
-    // Right icon buttons: Downloads, Bookmarks, Tor/Shield, Menu
-    // Positioned between URL bar end and window controls
-    int toolbarStart = width - CTRL_TOTAL - TOOLBAR_ICONS_W - 8;
-    const wchar_t* rightIcons[] = { ICON_DOWNLOAD, ICON_BOOKMARK, ICON_SHIELD, ICON_AI_SUMMARY, ICON_AI_JOURNEY, ICON_MORE };
-    COLORREF torColor = ch->settings.tor_enabled ? CLR_GREEN : CLR_TEXT_DIM;
-    COLORREF iconColors[] = { CLR_TEXT_DIM, CLR_TEXT_DIM, torColor, CLR_TEXT_DIM, CLR_TEXT_DIM, CLR_TEXT_DIM };
-    for (int i = 0; i < 6; i++) {
-        RECT ir = { toolbarStart + i * 32, 4,
-                    toolbarStart + i * 32 + 28, NAV_HEIGHT - 4 };
-        int btnId = 20 + i;
-        double alpha = ch->hoverAlphas[btnId];
-        if (alpha > 0.0) {
-            Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(alpha * 40.0), 255, 255, 255));
-            FillGdiplusRoundRect(graphics, ir, 6, hoverBrush);
+    // 4. SPACES Section Header
+    RECT spaceHeaderR = { 16, 92, 224, 108 };
+    DrawText16(hdc, "SPACES", spaceHeaderR, CLR_TEXT_DIM, ch->hTextTabFont);
+
+    // 3 Space Selector Chips
+    struct SpaceChip { const char* name; COLORREF color; bool active; };
+    SpaceChip spacesList[] = {
+        { "⚡ Sovereign AI", CLR_ACCENT, true },
+        { "🛡️ Privacy Guard", CLR_BRAVE_ORANGE, false },
+        { "💼 Work", RGB(59, 130, 246), false }
+    };
+    int spaceX = 12;
+    for (int s = 0; s < 3; s++) {
+        RECT chipR = { spaceX, 114, spaceX + 70, 134 };
+        COLORREF bgC = spacesList[s].active ? spacesList[s].color : CLR_BG_CARD;
+        COLORREF textC = spacesList[s].active ? RGB(255, 255, 255) : CLR_TEXT_DIM;
+        DrawRoundRect(hdc, chipR, 6, bgC, bgC);
+        DrawText16(hdc, spacesList[s].name, chipR, textC, ch->hTextTabFont);
+        spaceX += 74;
+    }
+
+    // 5. Vertical Tab Tree List
+    RECT tabHeaderR = { 16, 146, 224, 162 };
+    DrawText16(hdc, "TABS", tabHeaderR, CLR_TEXT_DIM, ch->hTextTabFont);
+
+    int tabY = 168;
+    const int VERT_TAB_H = 34;
+    for (int i = 0; i < (int)ch->tabs.size(); i++) {
+        ChromeTab& t = ch->tabs[i];
+        bool active = (i == ch->activeTab);
+        bool hover  = (i == ch->hoverTab);
+
+        RECT tR = { 12, tabY, 228, tabY + VERT_TAB_H };
+        t.tabRect = tR;
+
+        COLORREF tabBg = active ? CLR_BG_ACTIVE : (hover ? CLR_BG_CARD : CLR_BG_PRIMARY);
+        COLORREF borderC = active ? CLR_ACCENT : CLR_BG_PRIMARY;
+        DrawRoundRect(hdc, tR, 8, tabBg, borderC);
+
+        // Active tab left indicator line
+        if (active) {
+            RECT indicatorR = { 12, tabY + 4, 16, tabY + VERT_TAB_H - 4 };
+            FillRectColor(hdc, indicatorR, CLR_ACCENT);
         }
-        COLORREF baseColor = iconColors[i];
-        COLORREF hoverColor = CLR_TEXT;
-        BYTE rIcon = (BYTE)( (1.0 - alpha) * GetRValue(baseColor) + alpha * GetRValue(hoverColor) );
-        BYTE gIcon = (BYTE)( (1.0 - alpha) * GetGValue(baseColor) + alpha * GetGValue(hoverColor) );
-        BYTE bIcon = (BYTE)( (1.0 - alpha) * GetBValue(baseColor) + alpha * GetBValue(hoverColor) );
-        DrawIcon(hdc, rightIcons[i], ir, RGB(rIcon, gIcon, bIcon), ch->hIconFontLarge);
+
+        // Tab Title Text
+        const char* titleTxt = t.title.empty() ? "New Tab" : t.title.c_str();
+        RECT titleBox = { 24, tabY, 200, tabY + VERT_TAB_H };
+        DrawText16(hdc, titleTxt, titleBox, active ? CLR_TEXT : CLR_TEXT_DIM, ch->hTextFont);
+
+        // Close tab button ×
+        RECT closeR = { 204, tabY + 6, 222, tabY + VERT_TAB_H - 6 };
+        DrawIcon(hdc, ICON_CLOSE, closeR, CLR_TEXT_DIM, ch->hIconFontSmall);
+
+        tabY += VERT_TAB_H + 6;
     }
 
-    // Window control buttons: minimize, maximize/restore, close
-    // Anchored at the far right edge
-    RECT minR  = { width - CTRL_TOTAL,          0, width - CTRL_W * 2, NAV_HEIGHT };
-    RECT maxR  = { width - CTRL_W * 2,          0, width - CTRL_W,     NAV_HEIGHT };
-    RECT clsR  = { width - CTRL_W,              0, width,              NAV_HEIGHT };
-    
-    // Minimize hover
-    double minAlpha = ch->hoverAlphas[10];
-    if (minAlpha > 0.0) {
-        Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(minAlpha * 40.0), 255, 255, 255));
-        FillGdiplusRoundRect(graphics, minR, 6, hoverBrush);
-    }
-    BYTE rMinIcon = (BYTE)( (1.0 - minAlpha) * GetRValue(CLR_TEXT_DIM) + minAlpha * 255 );
-    BYTE gMinIcon = (BYTE)( (1.0 - minAlpha) * GetGValue(CLR_TEXT_DIM) + minAlpha * 255 );
-    BYTE bMinIcon = (BYTE)( (1.0 - minAlpha) * GetBValue(CLR_TEXT_DIM) + minAlpha * 255 );
-    DrawIcon(hdc, ICON_MINIMIZE, minR, RGB(rMinIcon, gMinIcon, bMinIcon), ch->hIconFont);
+    // New Tab "+" Button
+    RECT addTabR = { 12, tabY, 228, tabY + 30 };
+    DrawRoundRect(hdc, addTabR, 6, CLR_BG_CARD, CLR_BG_ACTIVE);
+    RECT addTextR = { 12, tabY, 228, tabY + 30 };
+    DrawText16(hdc, "+ New Tab", addTextR, CLR_ACCENT, ch->hTextFont);
 
-    // Maximize hover
-    double maxAlpha = ch->hoverAlphas[11];
-    if (maxAlpha > 0.0) {
-        Gdiplus::SolidBrush hoverBrush(Gdiplus::Color((BYTE)(maxAlpha * 40.0), 255, 255, 255));
-        FillGdiplusRoundRect(graphics, maxR, 6, hoverBrush);
-    }
-    BYTE rMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetRValue(CLR_TEXT_DIM) + maxAlpha * 255 );
-    BYTE gMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetGValue(CLR_TEXT_DIM) + maxAlpha * 255 );
-    BYTE bMaxIcon = (BYTE)( (1.0 - maxAlpha) * GetBValue(CLR_TEXT_DIM) + maxAlpha * 255 );
-    DrawIcon(hdc, IsZoomed(ch->hwnd) ? ICON_RESTORE : ICON_MAXIMIZE, maxR,
-             RGB(rMaxIcon, gMaxIcon, bMaxIcon), ch->hIconFont);
+    // 6. Bottom System Status Bar
+    int statusY = height - 44;
+    RECT statusR = { 0, statusY, SIDEBAR_WIDTH, height };
+    FillRectColor(hdc, statusR, CLR_BG_PRIMARY);
+    RECT topSep = { 0, statusY, SIDEBAR_WIDTH, statusY + 1 };
+    FillRectColor(hdc, topSep, CLR_BG_ACTIVE);
 
-    // Close button — red background on hover with smooth transition
-    double closeAlpha = ch->hoverAlphas[99];
-    if (closeAlpha > 0.0) {
-        Gdiplus::SolidBrush closeBrush(Gdiplus::Color((BYTE)(closeAlpha * 255.0), 196, 43, 28));
-        graphics.FillRectangle(&closeBrush, (float)clsR.left, (float)clsR.top, (float)(clsR.right - clsR.left), (float)(clsR.bottom - clsR.top));
-    }
-    BYTE rCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetRValue(CLR_TEXT_DIM) + closeAlpha * 255 );
-    BYTE gCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetGValue(CLR_TEXT_DIM) + closeAlpha * 255 );
-    BYTE bCloseIcon = (BYTE)( (1.0 - closeAlpha) * GetBValue(CLR_TEXT_DIM) + closeAlpha * 255 );
-    DrawIcon(hdc, ICON_CLOSE, clsR, RGB(rCloseIcon, gCloseIcon, bCloseIcon), ch->hIconFont);
+    // Green dot + Clearnet / DoH
+    HBRUSH dotB = CreateSolidBrush(CLR_GREEN);
+    RECT dotR = { 16, statusY + 16, 24, statusY + 24 };
+    HRGN dotRgn = CreateEllipticRgn(dotR.left, dotR.top, dotR.right, dotR.bottom);
+    FillRgn(hdc, dotRgn, dotB);
+    DeleteObject(dotRgn);
+    DeleteObject(dotB);
+
+    RECT statusTxtR = { 30, statusY + 10, 160, statusY + 34 };
+    DrawText16(hdc, "Clearnet / DoH · RAM 1.2 GB", statusTxtR, CLR_TEXT_DIM, ch->hTextTabFont);
 }
 
 // ---------------------------------------------------------------------------
@@ -718,22 +685,22 @@ static void PaintChrome(ChromeState* ch, HDC hdcOverride = nullptr) {
     RECT rc;
     GetClientRect(ch->hwnd, &rc);
     int W = rc.right;
+    int H = rc.bottom;
 
-    // Double-buffered paint
-    HDC hdc    = hdcOverride ? hdcOverride : GetDC(ch->hwnd);
-    HDC memDC  = CreateCompatibleDC(hdc);
-    HBITMAP bmp = CreateCompatibleBitmap(hdc, W, CHROME_H);
+    // Double-buffered paint for the 240px Arc Vertical Sidebar
+    HDC hdc     = hdcOverride ? hdcOverride : GetDC(ch->hwnd);
+    HDC memDC   = CreateCompatibleDC(hdc);
+    HBITMAP bmp = CreateCompatibleBitmap(hdc, SIDEBAR_WIDTH, H);
     HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
 
-    PaintNavBar(ch, memDC, W);
-    PaintTabStrip(ch, memDC, W);
+    PaintArcVerticalSidebar(ch, memDC, H);
 
-    // Blit to screen
-    BitBlt(hdc, 0, 0, W, CHROME_H, memDC, 0, 0, SRCCOPY);
+    // Blit sidebar to left screen edge (0 to 240px)
+    BitBlt(hdc, 0, 0, SIDEBAR_WIDTH, H, memDC, 0, 0, SRCCOPY);
     SelectObject(memDC, old);
     DeleteObject(bmp);
     DeleteDC(memDC);
-    
+
     if (!hdcOverride) {
         ReleaseDC(ch->hwnd, hdc);
     }
@@ -1112,8 +1079,8 @@ static void CreateNewTab(ChromeState* ch, const char* url = "aeon://newtab") {
 
     // Set viewport
     RECT rc; GetClientRect(ch->hwnd, &rc);
-    ch->engine->SetViewport(t.id, ch->hwnd, 0, CHROME_H,
-        rc.right, rc.bottom - CHROME_H);
+    ch->engine->SetViewport(t.id, ch->hwnd, 240, 0,
+        rc.right - 240, rc.bottom);
     ch->engine->FocusTab(t.id);
 
     // Inject AeonBridge bootstrap into every new document
@@ -1276,8 +1243,8 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
                     ch->activeTab = idx;
                     if (ch->engine) {
                         ch->engine->FocusTab(ch->tabs[idx].id);
-                        ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 0, CHROME_H,
-                            rc.right, rc.bottom - CHROME_H);
+                        ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 240, 0,
+                            rc.right - 240, rc.bottom);
                     }
                     // AI: Notify AI engines of tab focus change
                     if (g_TabIntel) g_TabIntel->OnTabFocused((uint64_t)ch->tabs[idx].id);
@@ -1737,8 +1704,8 @@ bool FocusTabById(HWND hwnd, unsigned int tabId) {
             if (ch->engine) {
                 ch->engine->FocusTab(tabId);
                 RECT rc; GetClientRect(hwnd, &rc);
-                ch->engine->SetViewport(tabId, hwnd, 0, CHROME_H,
-                    rc.right, rc.bottom - CHROME_H);
+                ch->engine->SetViewport(tabId, hwnd, 240, 0,
+                    rc.right - 240, rc.bottom);
             }
 
             // AI: Notify AI engines of tab focus change
