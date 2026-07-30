@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aeon Browser — Windows 11 Sovereign Workstation</title>
+  <title>Aeon Browser — Zen Workstation UI</title>
   <style>
     /* =========================================================
-       WINDOWS 11 FLUENT DESIGN SYSTEM & DARK TOKENS
+       ZEN BROWSER × WINDOWS 11 FLUENT DESIGN TOKENS
     ========================================================= */
     :root {
-      --win11-bg: #090a10;
-      --win11-sidebar: #0f111a;
-      --win11-card: #161826;
-      --win11-card-hover: #1e2133;
-      --win11-accent: #6c63ff;
-      --win11-accent-hover: #7c75ff;
-      --win11-text: #f3f4f6;
-      --win11-muted: #9ca3af;
-      --win11-border: rgba(255, 255, 255, 0.08);
-      --win11-border-active: rgba(108, 99, 255, 0.4);
+      --zen-bg: #090a0f;
+      --zen-sidebar: #0e1018;
+      --zen-card: #151824;
+      --zen-card-hover: #1d2133;
+      --zen-accent: #6c63ff;
+      --zen-accent-hover: #7d76ff;
+      --zen-text: #f1f3f9;
+      --zen-muted: #8c93a6;
+      --zen-border: rgba(255, 255, 255, 0.07);
+      --zen-border-active: rgba(108, 99, 255, 0.45);
       --font-segoe: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
     }
 
@@ -26,24 +26,26 @@
 
     html, body {
       width: 100%; height: 100%;
-      background: var(--win11-bg);
-      color: var(--win11-text);
+      background: var(--zen-bg);
+      color: var(--zen-text);
       font-family: var(--font-segoe);
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Ambient Windows 11 Glow */
+    /* Ambient Windows 11 Fluent Glow */
     body::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(108, 99, 255, 0.18) 0%, transparent 70%);
+      background:
+        radial-gradient(ellipse 70% 50% at 50% -10%, rgba(108, 99, 255, 0.16) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 60% at 85% 85%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
       pointer-events: none;
       z-index: 0;
     }
 
-    .app-shell {
+    .zen-shell {
       display: flex;
       width: 100vw;
       height: 100vh;
@@ -51,32 +53,33 @@
       z-index: 1;
     }
 
-    /* ── Windows 11 Modern Vertical Sidebar (240px) ── */
-    .win-sidebar {
+    /* ── Zen Browser Vertical Sidebar (240px) ── */
+    .zen-sidebar {
       width: 240px;
       height: 100vh;
-      background: var(--win11-sidebar);
-      border-right: 1px solid var(--win11-border);
-      padding: 16px 12px;
+      background: var(--zen-sidebar);
+      border-right: 1px solid var(--zen-border);
+      padding: 12px;
       display: flex;
       flex-direction: column;
       user-select: none;
       transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .win-sidebar.collapsed {
+    .zen-sidebar.collapsed {
       width: 56px;
-      padding: 16px 8px;
+      padding: 12px 8px;
       align-items: center;
     }
 
-    .sidebar-brand {
+    /* Sidebar Window Drag Region & Brand */
+    .zen-sidebar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
-      padding: 0 4px;
+      margin-bottom: 16px;
+      padding: 4px 6px;
     }
-    .brand-logo-group {
+    .zen-brand-group {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -84,7 +87,7 @@
       font-size: 15px;
       color: #ffffff;
     }
-    .win11-logo-icon {
+    .zen-app-logo {
       width: 28px;
       height: 28px;
       border-radius: 8px;
@@ -92,86 +95,95 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
+      font-weight: 900;
       color: #ffffff;
       font-size: 14px;
+      box-shadow: 0 0 12px rgba(108, 99, 255, 0.35);
     }
     .toggle-sidebar-btn {
       background: transparent;
       border: none;
-      color: var(--win11-muted);
+      color: var(--zen-muted);
       font-size: 13px;
       cursor: pointer;
-      padding: 6px;
+      padding: 4px 6px;
       border-radius: 6px;
       transition: background 0.15s;
     }
     .toggle-sidebar-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
-    /* Action Tiles */
-    .action-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
+    /* Zen Workspaces Icon Bar */
+    .zen-workspaces-bar {
+      display: flex;
       gap: 6px;
-      margin-bottom: 20px;
+      padding: 6px;
+      background: var(--zen-card);
+      border: 1px solid var(--zen-border);
+      border-radius: 10px;
+      margin-bottom: 16px;
     }
-    .action-tile {
+    .zen-workspace-item {
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 36px;
-      background: var(--win11-card);
-      border: 1px solid var(--win11-border);
-      border-radius: 8px;
+      height: 32px;
+      border-radius: 6px;
       font-size: 14px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      filter: grayscale(1);
+      opacity: 0.6;
+      transition: all 0.2s ease;
     }
-    .action-tile:hover {
-      background: var(--win11-card-hover);
-      border-color: var(--win11-accent);
-      transform: translateY(-1px);
+    .zen-workspace-item:hover, .zen-workspace-item.active {
+      filter: grayscale(0);
+      opacity: 1;
+      background: var(--zen-card-hover);
+    }
+    .zen-workspace-item.active {
+      border-bottom: 2px solid var(--zen-accent);
     }
 
-    .section-header {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--win11-muted);
-      letter-spacing: 0.8px;
+    .section-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--zen-muted);
+      letter-spacing: 1px;
       text-transform: uppercase;
-      margin: 12px 4px 8px;
+      margin: 12px 6px 8px;
     }
 
-    /* Tabs List */
-    .tabs-container {
+    /* Vertical Tabs List */
+    .zen-tabs-list {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
-    .tab-item {
+    .zen-tab-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 9px 12px;
       background: transparent;
       border-radius: 8px;
-      color: var(--win11-muted);
+      color: var(--zen-muted);
       font-size: 13px;
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .tab-item:hover {
+    .zen-tab-card:hover {
       background: rgba(255, 255, 255, 0.06);
       color: #ffffff;
     }
-    .tab-item.active {
-      background: var(--win11-card-hover);
+    .zen-tab-card.active {
+      background: var(--zen-card-hover);
       color: #ffffff;
       font-weight: 600;
-      border-left: 3px solid var(--win11-accent);
+      border-left: 3px solid var(--zen-accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    .tab-close-btn { opacity: 0.4; font-size: 13px; }
-    .tab-close-btn:hover { opacity: 1; color: #ef4444; }
+    .tab-close { opacity: 0.4; font-size: 13px; }
+    .tab-close:hover { opacity: 1; color: #ef4444; }
 
     .new-tab-btn {
       display: flex;
@@ -179,81 +191,80 @@
       justify-content: center;
       gap: 8px;
       padding: 9px;
-      background: var(--win11-card);
-      border: 1px dashed var(--win11-border);
+      background: var(--zen-card);
+      border: 1px dashed var(--zen-border-active);
       border-radius: 8px;
-      color: var(--win11-accent);
-      font-size: 13px;
-      font-weight: 600;
+      color: var(--zen-accent);
+      font-size: 12.5px;
+      font-weight: 700;
       cursor: pointer;
       margin-top: 10px;
       transition: all 0.15s;
     }
-    .new-tab-btn:hover { background: rgba(108, 99, 255, 0.12); border-color: var(--win11-accent); }
+    .new-tab-btn:hover { background: rgba(108, 99, 255, 0.14); }
 
     .sidebar-footer {
       margin-top: auto;
       padding-top: 12px;
-      border-top: 1px solid var(--win11-border);
-      font-size: 12px;
+      border-top: 1px solid var(--zen-border);
+      font-size: 11.5px;
       color: #10b981;
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* ── Main Viewport Content Area ── */
-    .main-viewport {
+    /* ── Main Canvas Viewport ── */
+    .zen-main-canvas {
       flex: 1;
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background: var(--win11-bg);
       padding: 8px 12px 12px;
     }
 
-    /* Windows 11 Top Bar */
-    .top-address-bar {
+    /* Windows 11 Address Bar */
+    .win11-address-bar {
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: var(--win11-sidebar);
-      border: 1px solid var(--win11-border);
+      gap: 10px;
+      background: var(--zen-sidebar);
+      border: 1px solid var(--zen-border);
       border-radius: 10px;
       padding: 6px 14px;
       margin-bottom: 8px;
     }
-    .nav-arrow {
+    .nav-btn {
       background: transparent;
       border: none;
-      color: var(--win11-muted);
-      font-size: 15px;
+      color: var(--zen-muted);
+      font-size: 14px;
       cursor: pointer;
       padding: 4px 6px;
       border-radius: 4px;
     }
-    .nav-arrow:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
+    .nav-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
-    .url-input-field {
+    .url-input {
       flex: 1;
-      background: var(--win11-card);
-      border: 1px solid var(--win11-border);
+      background: var(--zen-card);
+      border: 1px solid var(--zen-border);
       border-radius: 8px;
-      padding: 8px 14px;
+      padding: 7px 14px;
       color: #ffffff;
       font-size: 13.5px;
       outline: none;
       font-family: inherit;
     }
-    .url-input-field:focus { border-color: var(--win11-accent); }
+    .url-input:focus { border-color: var(--zen-accent); }
 
-    /* Windows 11 Caption Controls */
-    .win11-caption-controls {
+    /* Windows 11 Native Caption Controls */
+    .win11-caption-box {
       display: flex;
       align-items: center;
       gap: 2px;
     }
-    .caption-btn {
+    .win11-btn {
       width: 32px;
       height: 32px;
       display: flex;
@@ -261,134 +272,136 @@
       justify-content: center;
       background: transparent;
       border: none;
-      color: var(--win11-muted);
+      color: var(--zen-muted);
       font-size: 12px;
       cursor: pointer;
       border-radius: 6px;
     }
-    .caption-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
-    .caption-btn.close:hover { background: #dc2626; color: #ffffff; }
+    .win11-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .win11-btn.close:hover { background: #dc2626; color: #ffffff; }
 
-    /* Main Dashboard View */
-    .dashboard-canvas {
+    /* Dashboard View */
+    .dashboard-body {
       flex: 1;
-      background: var(--win11-sidebar);
-      border: 1px solid var(--win11-border);
+      background: var(--zen-sidebar);
+      border: 1px solid var(--zen-border);
       border-radius: 12px;
-      padding: 40px 24px;
+      padding: 48px 24px;
       display: flex;
       flex-direction: column;
       align-items: center;
       overflow-y: auto;
     }
 
-    .dashboard-title {
-      font-size: 32px;
+    .hero-title {
+      font-size: 34px;
       font-weight: 800;
       color: #ffffff;
       margin-bottom: 8px;
       letter-spacing: -0.5px;
     }
-    .dashboard-sub {
+    .hero-sub {
       font-size: 14px;
-      color: var(--win11-muted);
-      margin-bottom: 32px;
+      color: var(--zen-muted);
+      margin-bottom: 36px;
     }
 
-    .search-box-container {
+    .search-wrapper {
       width: 100%;
-      max-width: 600px;
+      max-width: 620px;
       display: flex;
       gap: 10px;
-      margin-bottom: 40px;
+      margin-bottom: 44px;
     }
-    .big-search-input {
+    .search-input {
       flex: 1;
-      background: var(--win11-card);
-      border: 1px solid var(--win11-border-active);
-      border-radius: 12px;
-      padding: 16px 20px;
+      background: var(--zen-card);
+      border: 1px solid var(--zen-border-active);
+      border-radius: 14px;
+      padding: 18px 24px;
       color: #ffffff;
       font-size: 15px;
       outline: none;
       font-family: inherit;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     }
-    .big-search-btn {
-      background: var(--win11-accent);
+    .search-btn {
+      background: var(--zen-accent);
       color: #ffffff;
       border: none;
-      padding: 0 24px;
-      border-radius: 12px;
+      padding: 0 28px;
+      border-radius: 14px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 14.5px;
       cursor: pointer;
       transition: background 0.15s;
     }
-    .big-search-btn:hover { background: var(--win11-accent-hover); }
+    .search-btn:hover { background: var(--zen-accent-hover); }
 
-    /* Quick Links Grid */
-    .quick-links-grid {
+    /* Quick Access Grid */
+    .quick-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       width: 100%;
-      max-width: 600px;
+      max-width: 620px;
     }
-    .link-card {
+    .quick-card {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      padding: 20px 16px;
-      background: var(--win11-card);
-      border: 1px solid var(--win11-border);
-      border-radius: 12px;
+      padding: 22px 16px;
+      background: var(--zen-card);
+      border: 1px solid var(--zen-border);
+      border-radius: 14px;
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .link-card:hover {
-      background: var(--win11-card-hover);
-      border-color: var(--win11-accent);
-      transform: translateY(-2px);
+    .quick-card:hover {
+      background: var(--zen-card-hover);
+      border-color: var(--zen-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(108, 99, 255, 0.2);
     }
-    .link-icon { font-size: 24px; }
-    .link-name { font-size: 13px; font-weight: 600; color: var(--win11-text); }
+    .quick-icon { font-size: 26px; }
+    .quick-label { font-size: 13px; font-weight: 600; color: var(--zen-text); }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <!-- Windows 11 Modern Sidebar -->
-    <div class="win-sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <div class="brand-logo-group">
-          <div class="win11-logo-icon">A</div>
+  <div class="zen-shell">
+    <!-- Zen Browser Vertical Sidebar -->
+    <div class="zen-sidebar" id="sidebar">
+      <div class="zen-sidebar-header">
+        <div class="zen-brand-group">
+          <div class="zen-app-logo">A</div>
           <span>Aeon Browser</span>
         </div>
         <button class="toggle-sidebar-btn" onclick="toggleSidebar()">◀</button>
       </div>
 
-      <div class="action-row">
-        <div class="action-tile" title="Search">🔍</div>
-        <div class="action-tile" title="Bookmarks">⭐</div>
-        <div class="action-tile" title="History">🕒</div>
-        <div class="action-tile" title="Settings">⚙️</div>
+      <!-- Zen Workspaces Selector Bar -->
+      <div class="zen-workspaces-bar">
+        <div class="zen-workspace-item active" title="General Space" onclick="switchSpace(this)">⚡</div>
+        <div class="zen-workspace-item" title="Privacy Shield Space" onclick="switchSpace(this)">🛡️</div>
+        <div class="zen-workspace-item" title="DelgadoLogic Work" onclick="switchSpace(this)">💼</div>
+        <div class="zen-workspace-item" title="Settings" onclick="switchSpace(this)">⚙️</div>
       </div>
 
-      <div class="section-header">OPEN TABS</div>
-      <div class="tabs-container">
-        <div class="tab-item active" onclick="navUrl('aeon://newtab')">
+      <div class="section-label">OPEN TABS</div>
+      <div class="zen-tabs-list">
+        <div class="zen-tab-card active" onclick="navUrl('aeon://newtab')">
           <span>🌐 New Tab</span>
-          <span class="tab-close-btn">×</span>
+          <span class="tab-close">×</span>
         </div>
-        <div class="tab-item" onclick="navUrl('https://www.google.com')">
+        <div class="zen-tab-card" onclick="navUrl('https://www.google.com')">
           <span>🔍 Google</span>
-          <span class="tab-close-btn">×</span>
+          <span class="tab-close">×</span>
         </div>
-        <div class="tab-item" onclick="navUrl('https://github.com')">
+        <div class="zen-tab-card" onclick="navUrl('https://github.com')">
           <span>🐙 GitHub</span>
-          <span class="tab-close-btn">×</span>
+          <span class="tab-close">×</span>
         </div>
       </div>
 
@@ -399,63 +412,63 @@
       </div>
     </div>
 
-    <!-- Main Viewport -->
-    <div class="main-viewport">
-      <div class="top-address-bar">
-        <button class="nav-arrow">←</button>
-        <button class="nav-arrow">→</button>
-        <button class="nav-arrow">↻</button>
-        <input type="text" class="url-input-field" id="urlBar" value="aeon://newtab" onkeydown="handleUrlKey(event)" />
+    <!-- Main Canvas Viewport -->
+    <div class="zen-main-canvas">
+      <div class="win11-address-bar">
+        <button class="nav-btn">←</button>
+        <button class="nav-btn">→</button>
+        <button class="nav-btn">↻</button>
+        <input type="text" class="url-input" id="urlBar" value="aeon://newtab" onkeydown="handleUrlKey(event)" />
 
-        <!-- Windows 11 Caption Controls (Native Style) -->
-        <div class="win11-caption-controls">
-          <button class="caption-btn" title="Minimize">—</button>
-          <button class="caption-btn" title="Maximize">☐</button>
-          <button class="caption-btn close" title="Close">✕</button>
+        <!-- Windows 11 Native Caption Controls -->
+        <div class="win11-caption-box">
+          <button class="win11-btn" title="Minimize">—</button>
+          <button class="win11-btn" title="Maximize">☐</button>
+          <button class="win11-btn close" title="Close">✕</button>
         </div>
       </div>
 
-      <div class="dashboard-canvas">
-        <h1 class="dashboard-title">Aeon Sovereign Workstation</h1>
-        <p class="dashboard-sub">Fast, Private, Sovereign Web Browsing for Windows 11</p>
+      <div class="dashboard-body">
+        <h1 class="hero-title">Aeon Sovereign Workstation</h1>
+        <p class="hero-sub">Fast, Private, Sovereign Web Browsing for Windows 11</p>
 
-        <div class="search-box-container">
-          <input type="text" class="big-search-input" id="searchInput" placeholder="Search Google or type a web address..." onkeydown="handleSearchKey(event)" />
-          <button class="big-search-btn" onclick="executeSearch()">Search</button>
+        <div class="search-wrapper">
+          <input type="text" class="search-input" id="searchInput" placeholder="Search Google or enter a web address..." onkeydown="handleSearchKey(event)" />
+          <button class="search-btn" onclick="executeSearch()">Search</button>
         </div>
 
-        <div class="quick-links-grid">
-          <div class="link-card" onclick="navUrl('https://www.google.com')">
-            <span class="link-icon">🔍</span>
-            <span class="link-name">Google</span>
+        <div class="quick-grid">
+          <div class="quick-card" onclick="navUrl('https://www.google.com')">
+            <span class="quick-icon">🔍</span>
+            <span class="quick-label">Google</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://github.com')">
-            <span class="link-icon">🐙</span>
-            <span class="link-name">GitHub</span>
+          <div class="quick-card" onclick="navUrl('https://github.com')">
+            <span class="quick-icon">🐙</span>
+            <span class="quick-label">GitHub</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://www.youtube.com')">
-            <span class="link-icon">▶️</span>
-            <span class="link-name">YouTube</span>
+          <div class="quick-card" onclick="navUrl('https://www.youtube.com')">
+            <span class="quick-icon">▶️</span>
+            <span class="quick-label">YouTube</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://news.ycombinator.com')">
-            <span class="link-icon">🟧</span>
-            <span class="link-name">Hacker News</span>
+          <div class="quick-card" onclick="navUrl('https://news.ycombinator.com')">
+            <span class="quick-icon">🟧</span>
+            <span class="quick-label">Hacker News</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://www.wikipedia.org')">
-            <span class="link-icon">📚</span>
-            <span class="link-name">Wikipedia</span>
+          <div class="quick-card" onclick="navUrl('https://www.wikipedia.org')">
+            <span class="quick-icon">📚</span>
+            <span class="quick-label">Wikipedia</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://x.com')">
-            <span class="link-icon">𝕏</span>
-            <span class="link-name">X / Twitter</span>
+          <div class="quick-card" onclick="navUrl('https://x.com')">
+            <span class="quick-icon">𝕏</span>
+            <span class="quick-label">X / Twitter</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://www.amazon.com')">
-            <span class="link-icon">🛒</span>
-            <span class="link-name">Amazon</span>
+          <div class="quick-card" onclick="navUrl('https://www.amazon.com')">
+            <span class="quick-icon">🛒</span>
+            <span class="quick-label">Amazon</span>
           </div>
-          <div class="link-card" onclick="navUrl('https://chatgpt.com')">
-            <span class="link-icon">🤖</span>
-            <span class="link-name">ChatGPT</span>
+          <div class="quick-card" onclick="navUrl('https://chatgpt.com')">
+            <span class="quick-icon">🤖</span>
+            <span class="quick-label">ChatGPT</span>
           </div>
         </div>
       </div>
@@ -465,6 +478,10 @@
   <script>
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+    function switchSpace(el) {
+      document.querySelectorAll('.zen-workspace-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
     }
     function navUrl(url) {
       if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('aeon://')) {
