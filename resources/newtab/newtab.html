@@ -1,586 +1,488 @@
 <!DOCTYPE html>
-<!--
-  Aeon Browser — aeon://newtab
-  DelgadoLogic | UI Team
-  
-  This is the New Tab page served when the user opens aeon://newtab.
-  It is a self-contained HTML file — no external CDN, no network requests.
-  All assets are inline (CSS font via @import from bundled font file,
-  icons are inline SVG).
-  
-  The C++ core serves this file from the embedded resources of Aeon.exe.
-  On legacy tiers (XP/Vista) the CSS animations are disabled via
-  a class injected by EraChrome.cpp: <body class="legacy-mode">
-  
-  PRIVACY: Speed Dial thumbnails are cached locally in %APPDATA%\Aeon\thumbnails\.
-  No URLs are sent to any server from this page.
--->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Tab — Aeon Browser</title>
+  <title>Aeon Browser — Arc Sovereign Workstation</title>
   <style>
     /* =========================================================
-       DESIGN SYSTEM — Aeon Dark Theme
+       WORLD-CLASS ARC BROWSER DESIGN SYSTEM & TOKENS
     ========================================================= */
     :root {
-      --bg-primary:    #0d0e14;
-      --bg-card:       #16182a;
-      --bg-card-hover: #1e2140;
-      --accent:        #6c63ff;
-      --accent-2:      #a78bfa;
-      --accent-glow:   rgba(108, 99, 255, 0.35);
-      --text-primary:  #e8e8f0;
-      --text-dim:      #8888aa;
-      --text-faint:    #44445a;
-      --border:        rgba(108,99,255,0.18);
-      --radius:        14px;
-      --radius-sm:     8px;
-      --transition:    0.22s cubic-bezier(0.4, 0, 0.2, 1);
-      --font:          'Segoe UI', system-ui, -apple-system, sans-serif;
+      --bg-dark: #07090e;
+      --bg-sidebar: #0d0f19;
+      --bg-card: #151828;
+      --bg-card-hover: #1c2035;
+      --bg-card-active: #242944;
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.35);
+      --brave-orange: #ff5500;
+      --work-blue: #3b82f6;
+      --text: #e8e8f0;
+      --muted: #8888aa;
+      --faint: #44445a;
+      --green: #68d391;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(108, 99, 255, 0.4);
+      --mono: 'JetBrains Mono', 'Consolas', monospace;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 100%; height: 100%;
-      background: var(--bg-primary);
-      color: var(--text-primary);
+      background: var(--bg-dark);
+      color: var(--text);
       font-family: var(--font);
-      overflow-x: hidden;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Animated aurora background */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 90% 70% at 15% 8%,  rgba(108,99,255,0.22) 0%, transparent 65%),
-        radial-gradient(ellipse 70% 90% at 85% 88%, rgba(167,139,250,0.16) 0%, transparent 65%),
-        radial-gradient(ellipse 50% 50% at 50% 45%, rgba(76,29,149,0.12)  0%, transparent 60%),
-        radial-gradient(ellipse 30% 30% at 30% 80%, rgba(108,99,255,0.08) 0%, transparent 55%);
-      animation: aurora 18s ease-in-out infinite alternate;
-      pointer-events: none;
-      z-index: 0;
-    }
-    @keyframes aurora {
-      0%   { transform: scale(1)   rotate(0deg);  opacity: 0.8; }
-      50%  { transform: scale(1.1) rotate(1deg);  opacity: 1;   }
-      100% { transform: scale(1)   rotate(-1deg); opacity: 0.8; }
-    }
-
-    /* Disable animations on legacy tier */
-    body.legacy-mode::before { animation: none; }
-    body.legacy-mode * { transition: none !important; animation: none !important; }
-
-    /* =========================================================
-       LAYOUT
-    ========================================================= */
-    .page {
+    /* Outer Arc Shell Layout */
+    .arc-shell {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg-dark);
       position: relative;
-      z-index: 1;
+    }
+
+    /* ── Collapsible Left Vertical Sidebar ── */
+    .arc-sidebar {
+      width: 240px;
+      height: 100vh;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      padding: 16px 14px;
       display: flex;
       flex-direction: column;
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+      user-select: none;
+    }
+    .arc-sidebar.collapsed {
+      width: 54px;
+      padding: 16px 8px;
       align-items: center;
-      min-height: 100vh;
-      padding: 0 24px;
     }
 
-    /* =========================================================
-       HEADER / BRAND
-    ========================================================= */
-    .brand {
-      margin-top: 48px;
+    .sidebar-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      opacity: 0.9;
-      animation: fadeUp 0.6s ease;
+      justify-content: space-between;
+      margin-bottom: 16px;
     }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0);    }
-    }
-
-    .brand-icon {
-      width: 36px; height: 36px;
-      filter: drop-shadow(0 0 10px var(--accent-glow));
-    }
-
-    .brand-name {
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-
-    /* =========================================================
-       SEARCH BAR
-    ========================================================= */
-    .search-wrap {
-      margin-top: 44px;
-      width: 100%;
-      max-width: 680px;
-      animation: fadeUp 0.7s 0.1s ease both;
-    }
-
-    .search-container {
-      position: relative;
+    .brand-group {
       display: flex;
       align-items: center;
-      background: var(--bg-card);
-      border: 1.5px solid var(--border);
-      border-radius: 48px;
-      padding: 0 20px;
-      height: 58px;
-      box-shadow:
-        0 0 0 0 var(--accent-glow),
-        0 4px 32px rgba(0,0,0,0.4);
-      transition: border-color var(--transition), box-shadow var(--transition);
+      gap: 10px;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.5px;
     }
-    .search-container:focus-within {
-      border-color: var(--accent);
-      box-shadow:
-        0 0 0 4px var(--accent-glow),
-        0 4px 32px rgba(0,0,0,0.4);
+    .logo-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #fff;
+      font-size: 14px;
+      box-shadow: 0 0 12px var(--accent-glow);
     }
-
-    .search-icon {
-      flex-shrink: 0;
-      width: 20px; height: 20px;
-      fill: var(--text-dim);
-      transition: fill var(--transition);
-    }
-    .search-container:focus-within .search-icon { fill: var(--accent-2); }
-
-    #search-input {
-      flex: 1;
+    .brand-title { color: #ffffff; }
+    .toggle-btn {
       background: transparent;
       border: none;
-      outline: none;
-      color: var(--text-primary);
-      font-family: var(--font);
-      font-size: 17px;
-      padding: 0 14px;
-      caret-color: var(--accent-2);
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: all 0.2s;
     }
-    #search-input::placeholder { color: var(--text-faint); }
+    .toggle-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
-    .search-engines {
+    .pinned-bar {
       display: flex;
+      justify-content: space-around;
+      padding: 8px 10px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+    .pinned-icon {
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .pinned-icon:hover { transform: scale(1.25); }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: #666688;
+      letter-spacing: 1.2px;
+      display: block;
+      margin: 12px 0 8px 4px;
+    }
+
+    .spaces-stack, .tabs-stack {
+      display: flex;
+      flex-direction: column;
       gap: 6px;
     }
-
-    .engine-btn {
-      background: none;
-      border: 1px solid transparent;
-      border-radius: 20px;
-      padding: 4px 10px;
-      font-size: 12px;
-      color: var(--text-dim);
-      cursor: pointer;
-      transition: all var(--transition);
-      white-space: nowrap;
-    }
-    .engine-btn:hover,
-    .engine-btn.active {
-      border-color: var(--accent);
-      color: var(--accent-2);
-      background: rgba(108,99,255,0.1);
-    }
-
-    /* =========================================================
-       SPEED DIAL
-    ========================================================= */
-    .section-label {
-      margin-top: 52px;
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      align-self: flex-start;
-      max-width: 900px;
-      width: 100%;
-      animation: fadeUp 0.7s 0.2s ease both;
-    }
-
-    .speed-dial {
-      margin-top: 16px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 12px;
-      max-width: 900px;
-      width: 100%;
-      animation: fadeUp 0.7s 0.25s ease both;
-    }
-
-    .dial-card {
+    .space-chip {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 12px 16px;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .space-chip:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+    .space-chip.active {
+      background: var(--space-color, var(--accent));
+      color: #ffffff;
+      border-color: var(--space-color, var(--accent));
+      box-shadow: 0 4px 14px rgba(108, 99, 255, 0.35);
+    }
+
+    .tab-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-left: 3px solid transparent;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+    .tab-card.active {
+      background: var(--bg-card-hover);
+      color: #ffffff;
+      border-left-color: var(--accent);
+      font-weight: 600;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    .tab-close { opacity: 0.5; font-size: 14px; }
+    .tab-close:hover { opacity: 1; color: #ff5500; }
+
+    .add-tab-btn {
+      background: var(--bg-card);
+      border: 1px dashed var(--border);
+      color: var(--accent);
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 8px;
+      transition: all 0.2s;
+    }
+    .add-tab-btn:hover { background: rgba(108, 99, 255, 0.15); border-color: var(--accent); }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      text-decoration: none;
-      color: var(--text-primary);
-      transition:
-        background var(--transition),
-        border-color var(--transition),
-        transform var(--transition),
-        box-shadow var(--transition);
-      position: relative;
-      overflow: hidden;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--green);
     }
-    .dial-card::before {
-      content: '';
+
+    /* ── Main Browser Viewport ── */
+    .arc-viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: var(--bg-dark);
+    }
+
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-sidebar);
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .url-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex: 0.85;
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 13px;
+    }
+    .url-text { flex: 1; color: var(--text); font-family: var(--mono); margin: 0 10px; }
+    .shield-badge {
+      background: rgba(255, 85, 0, 0.15);
+      border: 1px solid rgba(255, 85, 0, 0.4);
+      color: var(--brave-orange);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .body-card-area {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      background: #080a12;
+    }
+
+    .content-card {
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    .content-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .status-tag {
+      display: inline-block;
+      background: rgba(108, 99, 255, 0.15);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .h1-title { font-size: 24px; font-weight: 800; color: #ffffff; }
+
+    .search-box-row {
+      margin: 20px 0;
+      display: flex;
+      gap: 12px;
+    }
+    .main-search-input {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+      border-radius: 12px;
+      padding: 14px 20px;
+      color: #ffffff;
+      font-size: 15px;
+      outline: none;
+    }
+    .search-btn {
+      background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
+      color: #ffffff;
+      border: none;
+      padding: 0 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .log-console {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .log-line { display: flex; gap: 12px; }
+    .log-time { color: var(--muted); }
+    .log-msg { color: var(--text); }
+
+    /* Spotlight Command Bar Overlay */
+    .cmd-overlay {
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, var(--accent-glow), transparent 70%);
-      opacity: 0;
-      transition: opacity var(--transition);
+      background: rgba(7, 9, 14, 0.85);
+      backdrop-filter: blur(16px);
+      z-index: 100;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 80px;
     }
-    .dial-card:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 32px rgba(108,99,255,0.2);
-    }
-    .dial-card:hover::before { opacity: 1; }
-
-    .dial-favicon {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      background: rgba(255,255,255,0.06);
-      position: relative; z-index: 1;
-    }
-
-    .dial-label {
-      font-size: 12px;
-      color: var(--text-dim);
-      text-align: center;
-      position: relative; z-index: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-    }
-
-    /* Add new dial button */
-    .dial-add {
-      background: transparent;
-      border: 1.5px dashed var(--text-faint);
-      border-radius: var(--radius);
-      padding: 20px 12px 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      color: var(--text-faint);
-      transition: all var(--transition);
-    }
-    .dial-add:hover {
-      border-color: var(--accent);
-      color: var(--accent-2);
-      background: rgba(108,99,255,0.06);
-    }
-
-    /* =========================================================
-       PRIVACY BAR (bottom)
-    ========================================================= */
-    .privacy-bar {
-      margin-top: auto;
-      padding: 20px 0 16px;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      opacity: 0.6;
-      font-size: 12px;
-      color: var(--text-dim);
-      animation: fadeUp 0.8s 0.4s ease both;
-    }
-
-    .privacy-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .privacy-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 6px rgba(34,197,94,0.7);
-      flex-shrink: 0;
-    }
-    .privacy-dot.off { background: var(--text-faint); box-shadow: none; }
-
-    /* =========================================================
-       TIME / DATE
-    ========================================================= */
-    .clock {
-      margin-top: 48px;
-      text-align: center;
-      animation: fadeUp 0.6s 0.05s ease both;
-    }
-
-    #clock-time {
-      font-size: clamp(72px, 10vw, 110px);
-      font-weight: 200;
-      letter-spacing: -4px;
-      color: var(--text-primary);
-      line-height: 1;
-      text-shadow:
-        0 0 60px rgba(108,99,255,0.25),
-        0 0 120px rgba(108,99,255,0.10);
-    }
-
-    #clock-date {
-      font-size: 14px;
-      color: var(--text-dim);
-      margin-top: 6px;
-      letter-spacing: 0.04em;
-    }
-
-    /* =========================================================
-       RESPONSIVE
-    ========================================================= */
-    @media (max-width: 600px) {
-      #clock-time { font-size: 48px; }
-      .speed-dial { grid-template-columns: repeat(3, 1fr); }
-      .brand { margin-top: 28px; }
+    .cmd-overlay.open { display: flex; }
+    .cmd-modal {
+      width: 90%;
+      max-width: 600px;
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border-accent);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 30px 90px rgba(0,0,0,0.9), 0 0 40px var(--accent-glow);
     }
   </style>
 </head>
 <body>
-<div class="page">
+  <div class="arc-shell">
+    <!-- Collapsible Vertical Sidebar -->
+    <div class="arc-sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-group">
+          <div class="logo-badge">A</div>
+          <span class="brand-title">AEON</span>
+        </div>
+        <button class="toggle-btn" onclick="toggleSidebar()">◀</button>
+      </div>
 
-  <!-- Brand header -->
-  <div class="brand">
-    <!-- Inline SVG: Aeon hourglass/infinity icon (placeholder until Aeon.ico is final) -->
-    <svg class="brand-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="a" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stop-color="#6c63ff"/>
-          <stop offset="100%" stop-color="#a78bfa"/>
-        </linearGradient>
-        <filter id="glow">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
-          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <!-- Infinity / figure-8 shape -->
-      <path filter="url(#glow)"
-        d="M8 18 C8 13, 14 9, 18 14 C22 9, 28 13, 28 18 C28 23, 22 27, 18 22 C14 27, 8 23, 8 18 Z"
-        fill="none" stroke="url(#a)" stroke-width="2.2"/>
-      <!-- Center glow dot -->
-      <circle cx="18" cy="18" r="2" fill="url(#a)" opacity="0.9"/>
-    </svg>
-    <span class="brand-name">Aeon</span>
-  </div>
+      <div class="pinned-bar">
+        <span class="pinned-icon" title="Sovereign AI">⚡</span>
+        <span class="pinned-icon" title="Brave Shield">🛡️</span>
+        <span class="pinned-icon" title="GitHub">🐙</span>
+        <span class="pinned-icon" title="Settings">⚙️</span>
+      </div>
 
-  <!-- Clock -->
-  <div class="clock">
-    <div id="clock-time">--:--</div>
-    <div id="clock-date">Loading...</div>
-  </div>
+      <span class="section-title">SPACES</span>
+      <div class="spaces-stack">
+        <button class="space-chip active" style="--space-color: #6c63ff" onclick="switchSpace('sovereign')">⚡ Sovereign AI</button>
+        <button class="space-chip" style="--space-color: #ff5500" onclick="switchSpace('privacy')">🛡️ Privacy Guard</button>
+        <button class="space-chip" style="--space-color: #3b82f6" onclick="switchSpace('work')">💼 DelgadoLogic Work</button>
+      </div>
 
-  <!-- Search -->
-  <div class="search-wrap">
-    <div class="search-container">
-      <!-- Search icon -->
-      <svg class="search-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-          stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-          fill="none"/>
-      </svg>
-      <input id="search-input" type="text"
-        placeholder="Search or enter address"
-        autocomplete="off" spellcheck="false">
-      <div class="search-engines">
-        <button class="engine-btn active" data-engine="bing"    title="Bing">Bing</button>
-        <button class="engine-btn"        data-engine="ddg"     title="DuckDuckGo">DDG</button>
-        <button class="engine-btn"        data-engine="google"  title="Google">Google</button>
-        <button class="engine-btn"        data-engine="onion"   title="Onion/Tor" style="font-size:11px;">🧅 Tor</button>
+      <span class="section-title">TABS</span>
+      <div class="tabs-stack" id="tabsStack">
+        <div class="tab-card active" onclick="selectTab(0)">
+          <span>⚡ Sovereign AI Agent</span>
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab-card" onclick="selectTab(1)">
+          <span>🛡️ Brave Shield Guard</span>
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab-card" onclick="selectTab(2)">
+          <span>🌐 Sovereign P2P Network</span>
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+      <button class="add-tab-btn" onclick="openCmdBar()">+ New Tab / Command (Ctrl+K)</button>
+
+      <div class="sidebar-footer">
+        <span>🟢 Clearnet / DoH Active</span>
+        <span style="color: var(--muted)">RAM 1.2 GB · Local MCP Active</span>
+      </div>
+    </div>
+
+    <!-- Main Viewport -->
+    <div class="arc-viewport">
+      <div class="top-nav">
+        <div class="url-bar">
+          <span>🔒</span>
+          <span class="url-text" id="urlDisplay">aeon://sovereign-agent</span>
+          <button class="shield-badge">🛡️ 1,428</button>
+        </div>
+        <button class="toggle-btn" style="padding: 6px 14px; font-weight:700" onclick="openCmdBar()">⌘ Command Bar (Ctrl+K)</button>
+      </div>
+
+      <div class="body-card-area">
+        <div class="content-card">
+          <div class="content-header">
+            <div>
+              <span class="status-tag" id="statusTag">Local MCP Pipeline Active</span>
+              <h1 class="h1-title" id="cardTitle">Autonomous Web Intelligence Workstation</h1>
+            </div>
+          </div>
+
+          <div class="search-box-row">
+            <input type="text" class="main-search-input" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
+            <button class="search-btn" onclick="executeSearch()">Search / Go</button>
+          </div>
+
+          <div class="log-console" id="logConsole">
+            <div class="log-line"><span class="log-time">08:25:10</span><span class="log-msg">Connecting to local AeonWebMCP pipe...</span></div>
+            <div class="log-line"><span class="log-time">08:25:14</span><span class="log-msg">Parsing DOM snapshot with Rust tree serializer...</span></div>
+            <div class="log-line"><span class="log-time">08:25:18</span><span class="log-msg">Bypass tracker injected — 0 telemetry data leaked</span></div>
+            <div class="log-line"><span class="log-time">08:25:22</span><span class="log-msg">Autonomous task complete: 100% verified clean</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Speed Dial -->
-  <div class="section-label">Quick Access</div>
-  <div class="speed-dial" id="speed-dial">
-    <!-- Default dials — will be loaded from history/bookmarks via aeon:// protocol -->
-    <a class="dial-card" href="https://www.bing.com" data-aeon-dial>
-      <div class="dial-favicon">🔍</div>
-      <div class="dial-label">Bing</div>
-    </a>
-    <a class="dial-card" href="https://github.com" data-aeon-dial>
-      <div class="dial-favicon">🐙</div>
-      <div class="dial-label">GitHub</div>
-    </a>
-    <a class="dial-card" href="https://www.youtube.com" data-aeon-dial>
-      <div class="dial-favicon">▶️</div>
-      <div class="dial-label">YouTube</div>
-    </a>
-    <a class="dial-card" href="https://browseaeon.com" data-aeon-dial>
-      <div class="dial-favicon">⚡</div>
-      <div class="dial-label">DelgadoLogic</div>
-    </a>
-    <a class="dial-card" href="https://wikipedia.org" data-aeon-dial>
-      <div class="dial-favicon">📖</div>
-      <div class="dial-label">Wikipedia</div>
-    </a>
-    <a class="dial-card" href="http://3g2upl4pq6kufc4m.onion" data-aeon-dial>
-      <div class="dial-favicon">🧅</div>
-      <div class="dial-label">DDG Onion</div>
-    </a>
-    <button class="dial-add" id="dial-add-btn" onclick="aeon.addDial()">
-      <div class="dial-favicon" style="font-size:22px;background:none;">+</div>
-      <div class="dial-label">Add shortcut</div>
-    </button>
-  </div>
-
-  <!-- Privacy status bar -->
-  <div class="privacy-bar">
-    <div class="privacy-item" id="adblock-status">
-      <span class="privacy-dot" id="dot-adblock"></span>
-      <span id="label-adblock">AdBlock ON</span>
-    </div>
-    <div class="privacy-item" id="tor-status">
-      <span class="privacy-dot off" id="dot-tor"></span>
-      <span id="label-tor">Tor OFF</span>
-    </div>
-    <div class="privacy-item" id="https-status">
-      <span class="privacy-dot" id="dot-https"></span>
-      <span id="label-https">HTTPS upgrade</span>
-    </div>
-    <div class="privacy-item" id="fp-status">
-      <span class="privacy-dot" id="dot-fp"></span>
-      <span id="label-fp">FP Guard ON</span>
-    </div>
-    <div class="privacy-item" id="fw-status" style="display:none">
-      <span class="privacy-dot" id="dot-fw" style="background:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,0.7)"></span>
-      <span id="label-fw">Firewall Mode</span>
-    </div>
-    <div class="privacy-item" id="sentinel-status" style="display:none">
-      <span class="privacy-dot" id="dot-sentinel" style="background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,0.7)"></span>
-      <span id="label-sentinel">Auto Bypass</span>
+  <!-- Spotlight Command Bar Modal -->
+  <div class="cmd-overlay" id="cmdOverlay" onclick="closeCmdBar()">
+    <div class="cmd-modal" onclick="event.stopPropagation()">
+      <input type="text" class="main-search-input" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
     </div>
   </div>
 
-</div><!-- /.page -->
-
-<script>
-// =========================================================
-// CLOCK
-// =========================================================
-function updateClock() {
-  var now  = new Date();
-  var h    = now.getHours().toString().padStart(2, '0');
-  var m    = now.getMinutes().toString().padStart(2, '0');
-  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var mons = ['January','February','March','April','May','June',
-              'July','August','September','October','November','December'];
-  document.getElementById('clock-time').textContent = h + ':' + m;
-  document.getElementById('clock-date').textContent =
-    days[now.getDay()] + ', ' + mons[now.getMonth()] +
-    ' ' + now.getDate() + ', ' + now.getFullYear();
-}
-updateClock();
-setInterval(updateClock, 10000);
-
-// =========================================================
-// SEARCH
-// =========================================================
-var ENGINES = {
-  bing:   'https://www.bing.com/search?q=',
-  ddg:    'https://duckduckgo.com/?q=',
-  google: 'https://www.google.com/search?q=',
-  onion:  'https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/html/?q='
-};
-var activeEngine = 'bing';
-
-document.querySelectorAll('.engine-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.engine-btn').forEach(function(b) { b.classList.remove('active'); });
-    btn.classList.add('active');
-    activeEngine = btn.dataset.engine;
-    document.getElementById('search-input').focus();
-  });
-});
-
-document.getElementById('search-input').addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter') return;
-  var val = this.value.trim();
-  if (!val) return;
-
-  // Direct URL if it looks like one
-  if (/^https?:\/\//i.test(val) || /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/|$)/.test(val)) {
-    var url = (/^https?:\/\//i.test(val)) ? val : 'https://' + val;
-    try { window.aeonBridge?.navigate(url); } catch(_) { location.href = url; }
-  } else {
-    var searchUrl = ENGINES[activeEngine] + encodeURIComponent(val);
-    try { window.aeonBridge?.navigate(searchUrl); } catch(_) { location.href = searchUrl; }
-  }
-});
-
-// =========================================================
-// PRIVACY STATUS — read from C++ bridge (injected by PulseBridge)
-// aeon.settings is injected by EraChrome as a JSON object:
-// { adblock: true, tor: false, https_upgrade: true, fp_guard: true }
-// =========================================================
-function updatePrivacy() {
-  // Use __aeon (injected by AeonBridge::BuildInjectionScript) or legacy window.aeon
-  var s = (window.__aeon && window.__aeon.settings) ? window.__aeon.settings
-        : (window.aeon  && window.aeon.settings)    ? window.aeon.settings
-        : { adblock: true, tor_enabled: false, https_upgrade: true, fingerprint_guard: true };
-
-  // Network info
-  var net = (window.__aeon && window.__aeon.network) ? window.__aeon.network : {};
-
-  function setDot(id, labelId, active, onText, offText) {
-    var dot = document.getElementById(id);
-    var lbl = document.getElementById(labelId);
-    if (active) {
-      dot.className = 'privacy-dot';
-      lbl.textContent = onText;
-    } else {
-      dot.className = 'privacy-dot off';
-      lbl.textContent = offText;
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
     }
-  }
-
-  setDot('dot-adblock', 'label-adblock', s.adblock,           'AdBlock ON',   'AdBlock OFF');
-  setDot('dot-tor',     'label-tor',     s.tor_enabled,       'Tor ON',       'Tor OFF');
-  setDot('dot-https',   'label-https',   s.https_upgrade,     'HTTPS upgrade','HTTP only');
-  setDot('dot-fp',      'label-fp',      s.fingerprint_guard, 'FP Guard ON',  'FP Guard OFF');
-
-  // Firewall / bypass indicator
-  if (s.bypass_enabled || net.bypass_active) {
-    document.getElementById('fw-status').style.display = 'flex';
-    document.getElementById('label-fw').textContent = '🛡 DPI Bypass';
-  }
-  // Corporate/firewall network type
-  if (net.type && net.type !== 'Open' && net.type !== 'ISP_Throttle') {
-    document.getElementById('sentinel-status').style.display = 'flex';
-    document.getElementById('label-sentinel').textContent = '🔍 ' + net.type;
-  }
-}
-updatePrivacy();
-
-// =========================================================
-// LEGACY MODE — applied by EraChrome.cpp before page load
-// document.body.classList.add('legacy-mode')
-// =========================================================
-console.log('[Aeon] New Tab loaded. Bridge: ' + (window.aeon ? 'connected' : 'standalone'));
-</script>
+    function openCmdBar() {
+      document.getElementById('cmdOverlay').classList.add('open');
+      document.getElementById('cmdInput').focus();
+    }
+    function closeCmdBar() {
+      document.getElementById('cmdOverlay').classList.remove('open');
+    }
+    function handleCmdKey(e) {
+      if (e.key === 'Escape') closeCmdBar();
+      if (e.key === 'Enter') {
+        const val = document.getElementById('cmdInput').value;
+        if (val) {
+          document.getElementById('urlDisplay').innerText = val;
+          document.getElementById('cardTitle').innerText = 'Navigated: ' + val;
+          closeCmdBar();
+        }
+      }
+    }
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        openCmdBar();
+      }
+    });
+    function selectTab(idx) {
+      const titles = ['Autonomous Web Intelligence Workstation', 'Brave-Grade Privacy Shield Matrix', 'Decentralized P2P Patch Network'];
+      const urls = ['aeon://sovereign-agent', 'aeon://shield-statistics', 'aeon://p2p-mesh'];
+      document.getElementById('cardTitle').innerText = titles[idx];
+      document.getElementById('urlDisplay').innerText = urls[idx];
+      const tabs = document.querySelectorAll('.tab-card');
+      tabs.forEach((t, i) => t.classList.toggle('active', i === idx));
+    }
+    function executeSearch() {
+      const q = document.getElementById('searchInput').value;
+      if (q) {
+        document.getElementById('urlDisplay').innerText = 'https://www.google.com/search?q=' + encodeURIComponent(q);
+        document.getElementById('cardTitle').innerText = 'Search Results for: "' + q + '"';
+      }
+    }
+  </script>
 </body>
 </html>

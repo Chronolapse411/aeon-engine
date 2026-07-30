@@ -1079,8 +1079,8 @@ static void CreateNewTab(ChromeState* ch, const char* url = "aeon://newtab") {
 
     // Set viewport
     RECT rc; GetClientRect(ch->hwnd, &rc);
-    ch->engine->SetViewport(t.id, ch->hwnd, 240, 0,
-        rc.right - 240, rc.bottom);
+    ch->engine->SetViewport(t.id, ch->hwnd, 0, 0,
+        rc.right, rc.bottom);
     ch->engine->FocusTab(t.id);
 
     // Inject AeonBridge bootstrap into every new document
@@ -1243,8 +1243,8 @@ void OnLButtonDown(HWND hwnd, int x, int y) {
                     ch->activeTab = idx;
                     if (ch->engine) {
                         ch->engine->FocusTab(ch->tabs[idx].id);
-                        ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 240, 0,
-                            rc.right - 240, rc.bottom);
+                        ch->engine->SetViewport(ch->tabs[idx].id, hwnd, 0, 0,
+                            rc.right, rc.bottom);
                     }
                     // AI: Notify AI engines of tab focus change
                     if (g_TabIntel) g_TabIntel->OnTabFocused((uint64_t)ch->tabs[idx].id);
@@ -1704,8 +1704,8 @@ bool FocusTabById(HWND hwnd, unsigned int tabId) {
             if (ch->engine) {
                 ch->engine->FocusTab(tabId);
                 RECT rc; GetClientRect(hwnd, &rc);
-                ch->engine->SetViewport(tabId, hwnd, 240, 0,
-                    rc.right - 240, rc.bottom);
+                ch->engine->SetViewport(tabId, hwnd, 0, 0,
+                    rc.right, rc.bottom);
             }
 
             // AI: Notify AI engines of tab focus change
