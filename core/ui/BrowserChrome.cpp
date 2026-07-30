@@ -682,28 +682,10 @@ static void PaintTabStrip(ChromeState* ch, HDC hdc, int width) {
 // Full chrome paint
 // ---------------------------------------------------------------------------
 static void PaintChrome(ChromeState* ch, HDC hdcOverride = nullptr) {
-    RECT rc;
-    GetClientRect(ch->hwnd, &rc);
-    int W = rc.right;
-    int H = rc.bottom;
-
-    // Double-buffered paint for the 240px Arc Vertical Sidebar
-    HDC hdc     = hdcOverride ? hdcOverride : GetDC(ch->hwnd);
-    HDC memDC   = CreateCompatibleDC(hdc);
-    HBITMAP bmp = CreateCompatibleBitmap(hdc, SIDEBAR_WIDTH, H);
-    HBITMAP old = (HBITMAP)SelectObject(memDC, bmp);
-
-    PaintArcVerticalSidebar(ch, memDC, H);
-
-    // Blit sidebar to left screen edge (0 to 240px)
-    BitBlt(hdc, 0, 0, SIDEBAR_WIDTH, H, memDC, 0, 0, SRCCOPY);
-    SelectObject(memDC, old);
-    DeleteObject(bmp);
-    DeleteDC(memDC);
-
-    if (!hdcOverride) {
-        ReleaseDC(ch->hwnd, hdc);
-    }
+    // 100% Webview Arc Browser UI Architecture
+    // Webview viewport covers (0, 0, width, height) so the Webview engine
+    // renders the pure Arc Browser UI (sidebar, spaces, tabs, command bar).
+    (void)ch; (void)hdcOverride;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aeon Browser — Arc Sovereign Workstation</title>
+  <title>Aeon Browser — Sovereign Arc Workstation</title>
   <style>
     /* =========================================================
-       WORLD-CLASS ARC BROWSER DESIGN SYSTEM & TOKENS
+       PURE ARC BROWSER DESIGN SYSTEM & DESIGN TOKENS
     ========================================================= */
     :root {
-      --bg-dark: #07090e;
-      --bg-sidebar: #0d0f19;
-      --bg-card: #151828;
+      --bg-base: #06070b;
+      --bg-sidebar: #0b0d17;
+      --bg-card: #141727;
       --bg-card-hover: #1c2035;
       --bg-card-active: #242944;
       --accent: #6c63ff;
       --accent-glow: rgba(108, 99, 255, 0.35);
       --brave-orange: #ff5500;
       --work-blue: #3b82f6;
-      --text: #e8e8f0;
-      --muted: #8888aa;
-      --faint: #44445a;
-      --green: #68d391;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(108, 99, 255, 0.4);
+      --text-primary: #f0f2fc;
+      --text-muted: #8888aa;
+      --text-faint: #44445a;
+      --green-status: #22c55e;
+      --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+      --glass-border-active: 1px solid rgba(108, 99, 255, 0.4);
       --mono: 'JetBrains Mono', 'Consolas', monospace;
       --font: 'Inter', system-ui, -apple-system, sans-serif;
     }
@@ -32,29 +32,29 @@
 
     html, body {
       width: 100%; height: 100%;
-      background: var(--bg-dark);
-      color: var(--text);
+      background: var(--bg-base);
+      color: var(--text-primary);
       font-family: var(--font);
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Outer Arc Shell Layout */
+    /* Full Window Arc Workstation Shell */
     .arc-shell {
       display: flex;
       width: 100vw;
       height: 100vh;
-      background: var(--bg-dark);
+      background: var(--bg-base);
       position: relative;
     }
 
-    /* ── Collapsible Left Vertical Sidebar ── */
+    /* ── Pure Arc Vertical Sidebar (260px) ── */
     .arc-sidebar {
-      width: 240px;
+      width: 260px;
       height: 100vh;
       background: var(--bg-sidebar);
-      border-right: 1px solid var(--border);
-      padding: 16px 14px;
+      border-right: var(--glass-border);
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
       transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -62,67 +62,87 @@
       user-select: none;
     }
     .arc-sidebar.collapsed {
-      width: 54px;
-      padding: 16px 8px;
+      width: 60px;
+      padding: 14px 10px;
       align-items: center;
     }
 
-    .sidebar-header {
+    /* Top Sidebar Controls — Window Traffic Lights + Workspace Header */
+    .sidebar-top-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
     }
-    .brand-group {
+    .traffic-lights {
+      display: flex;
+      gap: 8px;
+    }
+    .light-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+
+    .brand-header {
       display: flex;
       align-items: center;
       gap: 10px;
       font-weight: 800;
       font-size: 15px;
       letter-spacing: 0.5px;
+      margin-bottom: 14px;
     }
-    .logo-badge {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
+    .brand-logo-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
       background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 900;
-      color: #fff;
-      font-size: 14px;
-      box-shadow: 0 0 12px var(--accent-glow);
+      color: #ffffff;
+      font-size: 15px;
+      box-shadow: 0 0 16px var(--accent-glow);
     }
     .brand-title { color: #ffffff; }
-    .toggle-btn {
+    .toggle-sidebar-btn {
       background: transparent;
       border: none;
-      color: var(--muted);
-      font-size: 12px;
+      color: var(--text-muted);
+      font-size: 13px;
       cursor: pointer;
-      padding: 4px 6px;
+      padding: 4px 8px;
       border-radius: 6px;
       transition: all 0.2s;
     }
-    .toggle-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .toggle-sidebar-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
-    .pinned-bar {
+    /* Pinned Favorites Row */
+    .pinned-row {
       display: flex;
       justify-content: space-around;
-      padding: 8px 10px;
+      padding: 10px;
       background: var(--bg-card);
-      border-radius: 10px;
+      border-radius: 12px;
+      border: var(--glass-border);
       margin-bottom: 16px;
     }
-    .pinned-icon {
-      font-size: 15px;
+    .pinned-tile {
+      font-size: 16px;
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .pinned-icon:hover { transform: scale(1.25); }
+    .pinned-tile:hover { transform: scale(1.3); }
 
-    .section-title {
+    /* Spaces Selector Matrix */
+    .section-label {
       font-size: 10px;
       font-weight: 800;
       color: #666688;
@@ -131,19 +151,19 @@
       margin: 12px 0 8px 4px;
     }
 
-    .spaces-stack, .tabs-stack {
+    .spaces-list, .tabs-list {
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
     .space-chip {
       background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      padding: 8px 12px;
-      border-radius: 8px;
+      border: var(--glass-border);
+      color: var(--text-muted);
+      padding: 9px 14px;
+      border-radius: 10px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       text-align: left;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -156,17 +176,18 @@
       background: var(--space-color, var(--accent));
       color: #ffffff;
       border-color: var(--space-color, var(--accent));
-      box-shadow: 0 4px 14px rgba(108, 99, 255, 0.35);
+      box-shadow: 0 4px 16px rgba(108, 99, 255, 0.4);
     }
 
+    /* Vertical Tab Cards */
     .tab-card {
       display: flex;
       justify-content: space-between;
       align-items: center;
       background: rgba(255, 255, 255, 0.03);
-      color: var(--muted);
+      color: var(--text-muted);
       border: 1px solid transparent;
-      border-left: 3px solid transparent;
+      border-left: 4px solid transparent;
       padding: 10px 14px;
       border-radius: 10px;
       font-size: 13px;
@@ -182,68 +203,71 @@
       color: #ffffff;
       border-left-color: var(--accent);
       font-weight: 600;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     }
-    .tab-close { opacity: 0.5; font-size: 14px; }
-    .tab-close:hover { opacity: 1; color: #ff5500; }
+    .tab-close-icon { opacity: 0.4; font-size: 14px; }
+    .tab-close-icon:hover { opacity: 1; color: var(--brave-orange); }
 
-    .add-tab-btn {
+    .new-tab-button {
       background: var(--bg-card);
-      border: 1px dashed var(--border);
+      border: 1px dashed var(--glass-border-active);
       color: var(--accent);
-      padding: 8px;
-      border-radius: 8px;
+      padding: 10px;
+      border-radius: 10px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       text-align: center;
       margin-top: 8px;
       transition: all 0.2s;
     }
-    .add-tab-btn:hover { background: rgba(108, 99, 255, 0.15); border-color: var(--accent); }
+    .new-tab-button:hover { background: rgba(108, 99, 255, 0.15); }
 
-    .sidebar-footer {
+    .sidebar-bottom-status {
       margin-top: auto;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      border-top: var(--glass-border);
       display: flex;
       flex-direction: column;
       gap: 4px;
       font-size: 11px;
-      color: var(--green);
+      color: var(--green-status);
     }
 
-    /* ── Main Browser Viewport ── */
-    .arc-viewport {
+    /* ── Right Main Area — Floating Web Content Canvas ── */
+    .arc-main-area {
       flex: 1;
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background: var(--bg-dark);
+      padding: 10px;
+      background: var(--bg-base);
     }
 
-    .top-nav {
+    .floating-top-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       background: var(--bg-sidebar);
-      padding: 10px 20px;
-      border-bottom: 1px solid var(--border);
+      border: var(--glass-border);
+      border-radius: 14px;
+      padding: 8px 16px;
+      margin-bottom: 10px;
     }
 
-    .url-bar {
+    .url-pill-box {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex: 0.85;
       background: var(--bg-card);
-      border: 1px solid var(--border-accent);
+      border: var(--glass-border-active);
       border-radius: 20px;
       padding: 6px 16px;
       font-size: 13px;
     }
-    .url-text { flex: 1; color: var(--text); font-family: var(--mono); margin: 0 10px; }
-    .shield-badge {
+    .url-text-val { flex: 1; color: var(--text-primary); font-family: var(--mono); margin: 0 10px; }
+    .shield-counter-badge {
       background: rgba(255, 85, 0, 0.15);
       border: 1px solid rgba(255, 85, 0, 0.4);
       color: var(--brave-orange);
@@ -254,27 +278,22 @@
       cursor: pointer;
     }
 
-    .body-card-area {
+    .canvas-card {
       flex: 1;
-      padding: 24px;
-      overflow-y: auto;
-      background: #080a12;
-    }
-
-    .content-card {
       background: var(--bg-sidebar);
-      border: 1px solid var(--border);
+      border: var(--glass-border);
       border-radius: 16px;
       padding: 24px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+      overflow-y: auto;
     }
-    .content-header {
+    .canvas-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
-    .status-tag {
+    .status-badge {
       display: inline-block;
       background: rgba(108, 99, 255, 0.15);
       color: var(--accent);
@@ -284,159 +303,165 @@
       border-radius: 6px;
       margin-bottom: 8px;
     }
-    .h1-title { font-size: 24px; font-weight: 800; color: #ffffff; }
+    .h1-headline { font-size: 26px; font-weight: 800; color: #ffffff; }
 
-    .search-box-row {
-      margin: 20px 0;
+    .search-input-group {
       display: flex;
       gap: 12px;
+      margin: 24px 0;
     }
-    .main-search-input {
+    .search-input-field {
       flex: 1;
       background: var(--bg-card);
-      border: 1px solid var(--border-accent);
-      border-radius: 12px;
-      padding: 14px 20px;
+      border: var(--glass-border-active);
+      border-radius: 14px;
+      padding: 16px 20px;
       color: #ffffff;
       font-size: 15px;
       outline: none;
+      font-family: inherit;
     }
-    .search-btn {
+    .search-action-btn {
       background: linear-gradient(135deg, #6c63ff 0%, #a78bfa 100%);
       color: #ffffff;
       border: none;
-      padding: 0 24px;
-      border-radius: 12px;
-      font-weight: 700;
+      padding: 0 28px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 14px;
       cursor: pointer;
     }
 
-    .log-console {
-      background: var(--bg-dark);
-      border: 1px solid var(--border);
+    .log-stream-console {
+      background: var(--bg-base);
+      border: var(--glass-border);
       border-radius: 12px;
-      padding: 16px;
+      padding: 18px;
       font-family: var(--mono);
       font-size: 13px;
-      line-height: 1.8;
+      line-height: 1.9;
     }
-    .log-line { display: flex; gap: 12px; }
-    .log-time { color: var(--muted); }
-    .log-msg { color: var(--text); }
+    .log-row { display: flex; gap: 14px; }
+    .log-timestamp { color: var(--text-muted); }
+    .log-content { color: var(--text-primary); }
 
-    /* Spotlight Command Bar Overlay */
-    .cmd-overlay {
+    /* Spotlight Command Bar Overlay (Ctrl+K) */
+    .cmd-palette-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(7, 9, 14, 0.85);
-      backdrop-filter: blur(16px);
+      background: rgba(6, 7, 11, 0.85);
+      backdrop-filter: blur(20px);
       z-index: 100;
       display: none;
       align-items: flex-start;
       justify-content: center;
-      padding-top: 80px;
+      padding-top: 90px;
     }
-    .cmd-overlay.open { display: flex; }
-    .cmd-modal {
+    .cmd-palette-backdrop.active { display: flex; }
+    .cmd-palette-card {
       width: 90%;
-      max-width: 600px;
+      max-width: 640px;
       background: var(--bg-sidebar);
-      border: 1px solid var(--border-accent);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 30px 90px rgba(0,0,0,0.9), 0 0 40px var(--accent-glow);
+      border: var(--glass-border-active);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 35px 100px rgba(0,0,0,0.9), 0 0 50px var(--accent-glow);
     }
   </style>
 </head>
 <body>
   <div class="arc-shell">
-    <!-- Collapsible Vertical Sidebar -->
+    <!-- 100% Pure Arc Vertical Sidebar -->
     <div class="arc-sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-group">
-          <div class="logo-badge">A</div>
-          <span class="brand-title">AEON</span>
+      <div class="sidebar-top-bar">
+        <div class="traffic-lights">
+          <span class="light-dot dot-red"></span>
+          <span class="light-dot dot-yellow"></span>
+          <span class="light-dot dot-green"></span>
         </div>
-        <button class="toggle-btn" onclick="toggleSidebar()">◀</button>
+        <button class="toggle-sidebar-btn" onclick="toggleSidebar()">◀</button>
       </div>
 
-      <div class="pinned-bar">
-        <span class="pinned-icon" title="Sovereign AI">⚡</span>
-        <span class="pinned-icon" title="Brave Shield">🛡️</span>
-        <span class="pinned-icon" title="GitHub">🐙</span>
-        <span class="pinned-icon" title="Settings">⚙️</span>
+      <div class="brand-header">
+        <div class="brand-logo-badge">A</div>
+        <span class="brand-title">AEON</span>
       </div>
 
-      <span class="section-title">SPACES</span>
-      <div class="spaces-stack">
+      <div class="pinned-row">
+        <span class="pinned-tile" title="Local Sovereign AI">⚡</span>
+        <span class="pinned-tile" title="Brave Privacy Shield">🛡️</span>
+        <span class="pinned-tile" title="GitHub Workstation">🐙</span>
+        <span class="pinned-tile" title="Settings Engine">⚙️</span>
+      </div>
+
+      <span class="section-label">SPACES</span>
+      <div class="spaces-list">
         <button class="space-chip active" style="--space-color: #6c63ff" onclick="switchSpace('sovereign')">⚡ Sovereign AI</button>
         <button class="space-chip" style="--space-color: #ff5500" onclick="switchSpace('privacy')">🛡️ Privacy Guard</button>
         <button class="space-chip" style="--space-color: #3b82f6" onclick="switchSpace('work')">💼 DelgadoLogic Work</button>
       </div>
 
-      <span class="section-title">TABS</span>
-      <div class="tabs-stack" id="tabsStack">
+      <span class="section-label">TABS</span>
+      <div class="tabs-list">
         <div class="tab-card active" onclick="selectTab(0)">
           <span>⚡ Sovereign AI Agent</span>
-          <span class="tab-close">×</span>
+          <span class="tab-close-icon">×</span>
         </div>
         <div class="tab-card" onclick="selectTab(1)">
           <span>🛡️ Brave Shield Guard</span>
-          <span class="tab-close">×</span>
+          <span class="tab-close-icon">×</span>
         </div>
         <div class="tab-card" onclick="selectTab(2)">
           <span>🌐 Sovereign P2P Network</span>
-          <span class="tab-close">×</span>
+          <span class="tab-close-icon">×</span>
         </div>
       </div>
-      <button class="add-tab-btn" onclick="openCmdBar()">+ New Tab / Command (Ctrl+K)</button>
+      <button class="new-tab-button" onclick="openCmdBar()">+ New Tab / Command (Ctrl+K)</button>
 
-      <div class="sidebar-footer">
+      <div class="sidebar-bottom-status">
         <span>🟢 Clearnet / DoH Active</span>
-        <span style="color: var(--muted)">RAM 1.2 GB · Local MCP Active</span>
+        <span style="color: var(--text-muted)">RAM 1.2 GB · Local MCP Active</span>
       </div>
     </div>
 
-    <!-- Main Viewport -->
-    <div class="arc-viewport">
-      <div class="top-nav">
-        <div class="url-bar">
+    <!-- Main Floating Web Viewport Canvas -->
+    <div class="arc-main-area">
+      <div class="floating-top-bar">
+        <div class="url-pill-box">
           <span>🔒</span>
-          <span class="url-text" id="urlDisplay">aeon://sovereign-agent</span>
-          <button class="shield-badge">🛡️ 1,428</button>
+          <span class="url-text-val" id="urlDisplay">aeon://sovereign-agent</span>
+          <button class="shield-counter-badge">🛡️ 1,428</button>
         </div>
-        <button class="toggle-btn" style="padding: 6px 14px; font-weight:700" onclick="openCmdBar()">⌘ Command Bar (Ctrl+K)</button>
+        <button class="toggle-sidebar-btn" style="padding: 6px 16px; font-weight:800; background: var(--bg-card);" onclick="openCmdBar()">⌘ Command Bar (Ctrl+K)</button>
       </div>
 
-      <div class="body-card-area">
-        <div class="content-card">
-          <div class="content-header">
-            <div>
-              <span class="status-tag" id="statusTag">Local MCP Pipeline Active</span>
-              <h1 class="h1-title" id="cardTitle">Autonomous Web Intelligence Workstation</h1>
-            </div>
+      <div class="canvas-card">
+        <div class="canvas-header">
+          <div>
+            <span class="status-badge" id="statusTag">Local MCP Pipeline Active</span>
+            <h1 class="h1-headline" id="cardTitle">Autonomous Web Intelligence Workstation</h1>
           </div>
+        </div>
 
-          <div class="search-box-row">
-            <input type="text" class="main-search-input" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
-            <button class="search-btn" onclick="executeSearch()">Search / Go</button>
-          </div>
+        <div class="search-input-group">
+          <input type="text" class="search-input-field" id="searchInput" placeholder="Search Google, query local AI agent, or enter URL..." />
+          <button class="search-action-btn" onclick="executeSearch()">Search / Go</button>
+        </div>
 
-          <div class="log-console" id="logConsole">
-            <div class="log-line"><span class="log-time">08:25:10</span><span class="log-msg">Connecting to local AeonWebMCP pipe...</span></div>
-            <div class="log-line"><span class="log-time">08:25:14</span><span class="log-msg">Parsing DOM snapshot with Rust tree serializer...</span></div>
-            <div class="log-line"><span class="log-time">08:25:18</span><span class="log-msg">Bypass tracker injected — 0 telemetry data leaked</span></div>
-            <div class="log-line"><span class="log-time">08:25:22</span><span class="log-msg">Autonomous task complete: 100% verified clean</span></div>
-          </div>
+        <div class="log-stream-console">
+          <div class="log-row"><span class="log-timestamp">08:25:10</span><span class="log-content">Connecting to local AeonWebMCP pipe...</span></div>
+          <div class="log-row"><span class="log-timestamp">08:25:14</span><span class="log-content">Parsing DOM snapshot with Rust tree serializer...</span></div>
+          <div class="log-row"><span class="log-timestamp">08:25:18</span><span class="log-content">Bypass tracker injected — 0 telemetry data leaked</span></div>
+          <div class="log-row"><span class="log-timestamp">08:25:22</span><span class="log-content">Autonomous task complete: 100% verified clean</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Spotlight Command Bar Modal -->
-  <div class="cmd-overlay" id="cmdOverlay" onclick="closeCmdBar()">
-    <div class="cmd-modal" onclick="event.stopPropagation()">
-      <input type="text" class="main-search-input" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
+  <!-- Spotlight Command Bar Modal (Ctrl+K) -->
+  <div class="cmd-palette-backdrop" id="cmdOverlay" onclick="closeCmdBar()">
+    <div class="cmd-palette-card" onclick="event.stopPropagation()">
+      <input type="text" class="search-input-field" placeholder="Type a command or search URL... (press ESC to exit)" autoFocus id="cmdInput" onkeydown="handleCmdKey(event)" />
     </div>
   </div>
 
@@ -445,11 +470,11 @@
       document.getElementById('sidebar').classList.toggle('collapsed');
     }
     function openCmdBar() {
-      document.getElementById('cmdOverlay').classList.add('open');
+      document.getElementById('cmdOverlay').classList.add('active');
       document.getElementById('cmdInput').focus();
     }
     function closeCmdBar() {
-      document.getElementById('cmdOverlay').classList.remove('open');
+      document.getElementById('cmdOverlay').classList.remove('active');
     }
     function handleCmdKey(e) {
       if (e.key === 'Escape') closeCmdBar();
