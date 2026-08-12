@@ -32,6 +32,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include "AeonBridge.h"
+#include "TierDispatcher.h"
 #include "../settings/SettingsEngine.h"
 #include "../history/HistoryEngine.h"
 #include "../download/DownloadManager.h"
@@ -631,13 +632,25 @@ std::string Dispatch(const char* method, const char* argsJson) {
 
     // Navigation
     if (!strcmp(method, "navigate")) {
+        std::string urlStr;
         if (argsJson && argsJson[0] == '"') {
             // JSON string — strip quotes
-            std::string url(argsJson + 1);
-            if (!url.empty() && url.back() == '"') url.pop_back();
-            Bridge_Navigate(url.c_str());
-        } else {
-            Bridge_Navigate(argsJson);
+            urlStr = argsJson + 1;
+            if (!urlStr.empty() && urlStr.back() == '"') urlStr.pop_back();
+        } else if (argsJson) {
+            urlStr = argsJson;
+        }
+        if (!urlStr.empty()) {
+            if (TierDispatcher::IsProtectedDomain(urlStr.c_str())) {
+                AeonEngineVTable* engineToUse = TierDispatcher::GetInstance().GetEngineForUrl(urlStr.c_str());
+                if (engineToUse && engineToUse->Navigate) {
+                    engineToUse->Navigate(0, urlStr.c_str(), nullptr);
+                } else {
+                    Bridge_Navigate(urlStr.c_str());
+                }
+            } else {
+                Bridge_Navigate(urlStr.c_str());
+            }
         }
         return "null";
     }

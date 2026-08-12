@@ -7,6 +7,7 @@
 // =============================================================================
 
 #include "aeon_tab_intelligence.h"
+#include "../engines/aeon_ai.h"
 
 #include <algorithm>
 #include <cstring>
@@ -137,6 +138,17 @@ public:
 
     const char* ClassifyByKeywords(const char* url, const char* title,
                                     float* confidence) {
+        // First attempt classification via AeonAI engine (gemma4:e2b / gemma4:12b)
+        std::string ai_topic = AeonAIInstance().ClassifyTopicLLM(url ? url : "", title ? title : "");
+        if (!ai_topic.empty()) {
+            for (uint32_t i = 0; i < AEON_TOPIC_COUNT; ++i) {
+                if (ai_topic == AEON_TAB_TOPICS[i]) {
+                    if (confidence) *confidence = 0.95f;
+                    return AEON_TAB_TOPICS[i];
+                }
+            }
+        }
+
         // Convert to lowercase for matching
         std::string combined;
         if (url) combined += url;

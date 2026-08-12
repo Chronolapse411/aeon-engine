@@ -39,6 +39,7 @@
 
 #include "BrowserChrome.h"
 #include "../../core/engine/AeonEngine_Interface.h"
+#include "../../core/engine/TierDispatcher.h"
 #include "../../core/probe/HardwareProbe.h"
 #include "../../core/settings/SettingsEngine.h"
 #include <windows.h>
@@ -973,7 +974,9 @@ static void CommitUrlBar(ChromeState* ch) {
         auto& t = ch->tabs[ch->activeTab];
         t.url = url;
         t.loading = true;
-        if (ch->engine) ch->engine->Navigate(t.id, url.c_str(), nullptr);
+        AeonEngineVTable* engineToUse = TierDispatcher::GetInstance().GetEngineForUrl(url.c_str());
+        if (!engineToUse) engineToUse = ch->engine;
+        if (engineToUse) engineToUse->Navigate(t.id, url.c_str(), nullptr);
         // Start loading animation timer
         SetTimer(ch->hwnd, ID_LOADING_TIMER, LOADING_TIMER_MS, nullptr);
     }
@@ -1081,7 +1084,9 @@ static void NavigateActiveTab(ChromeState* ch, const char* url) {
         auto& t = ch->tabs[ch->activeTab];
         t.url = url;
         t.loading = true;
-        if (ch->engine) ch->engine->Navigate(t.id, url, nullptr);
+        AeonEngineVTable* engineToUse = TierDispatcher::GetInstance().GetEngineForUrl(url);
+        if (!engineToUse) engineToUse = ch->engine;
+        if (engineToUse) engineToUse->Navigate(t.id, url, nullptr);
         SetTimer(ch->hwnd, ID_LOADING_TIMER, LOADING_TIMER_MS, nullptr);
         PaintChrome(ch);
     }
@@ -1611,8 +1616,11 @@ unsigned int CreateTab(HWND hwnd, const char* url) {
     if (!ch || !ch->engine) return 0;
 
     const char* targetUrl = (url && url[0]) ? url : "aeon://newtab";
+    AeonEngineVTable* engineToUse = TierDispatcher::GetInstance().GetEngineForUrl(targetUrl);
+    if (!engineToUse) engineToUse = ch->engine;
+
     ChromeTab t;
-    t.id = ch->engine->NewTab(ch->hwnd, targetUrl);
+    t.id = engineToUse->NewTab(ch->hwnd, targetUrl);
     t.url = targetUrl;
     t.title = "New Tab";
     t.loading = false;
@@ -1622,13 +1630,13 @@ unsigned int CreateTab(HWND hwnd, const char* url) {
     ch->activeTab = (int)ch->tabs.size() - 1;
 
     RECT rc; GetClientRect(ch->hwnd, &rc);
-    ch->engine->SetViewport(t.id, ch->hwnd, 0, CHROME_H,
+    engineToUse->SetViewport(t.id, ch->hwnd, 0, CHROME_H,
         rc.right, rc.bottom - CHROME_H);
-    ch->engine->FocusTab(t.id);
+    engineToUse->FocusTab(t.id);
 
     // Inject AeonBridge bootstrap
     std::string bridgeJs = AeonBridge::BuildInjectionScript();
-    ch->engine->InjectEarlyJS(t.id, bridgeJs.c_str());
+    engineToUse->InjectEarlyJS(t.id, bridgeJs.c_str());
 
     // AI: Notify TabIntelligence of new tab (from UI action)
     if (g_TabIntel) {
@@ -1712,7 +1720,9 @@ bool NavigateTab(HWND hwnd, unsigned int tabId, const char* url) {
         if (t.id == tabId) {
             t.url = url;
             t.loading = true;
-            ch->engine->Navigate(tabId, url, nullptr);
+            AeonEngineVTable* engineToUse = TierDispatcher::GetInstance().GetEngineForUrl(url);
+            if (!engineToUse) engineToUse = ch->engine;
+            if (engineToUse) engineToUse->Navigate(tabId, url, nullptr);
             PaintChrome(ch);
             fprintf(stdout, "[Agent] Navigate tab #%u: %s\n", tabId, url);
             return true;

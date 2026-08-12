@@ -16,6 +16,7 @@
 
 #include "AeonAgentPipe.h"
 #include "../ui/BrowserChrome.h"
+#include "../session/SessionManager.h"
 #include "../AeonVersion.h"
 #include "../../ai/aeon_tab_intelligence.h"
 #include "../../ai/aeon_journey_analytics.h"
@@ -211,21 +212,52 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
     }
     // ── Session State Sovereignty (Playwright auth.json compatibility) ──
     else if (cmd == "session.export") {
+        std::string path = JsonGetString(data->json, "path");
+        const char* pathPtr = path.empty() ? nullptr : path.c_str();
+
+        int cookiesCount = 0;
+        int originsCount = 0;
+        bool ok = SessionManager::GetInstance().ExportSessionState(pathPtr, &cookiesCount, &originsCount);
+
         char exeDir[MAX_PATH];
         GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
         if (char* s = strrchr(exeDir, '\\')) *s = '\0';
-        char jsonPath[MAX_PATH];
-        _snprintf_s(jsonPath, sizeof(jsonPath), _TRUNCATE, "%s\\userDataDir\\auth.json", exeDir);
+        char defaultPath[MAX_PATH];
+        _snprintf_s(defaultPath, sizeof(defaultPath), _TRUNCATE, "%s\\userDataDir\\auth.json", exeDir);
+
+        const char* finalPath = (pathPtr && *pathPtr) ? pathPtr : defaultPath;
 
         char responseBuf[1024];
-        _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
-            "{\"ok\":true,\"storage_state_path\":\"%s\",\"exported\":true}\n",
-            JsonEscape(jsonPath).c_str());
+        if (ok) {
+            _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
+                "{\"ok\":true,\"storage_state_path\":\"%s\",\"exported\":true,\"cookies_count\":%d,\"origins_count\":%d}\n",
+                JsonEscape(finalPath).c_str(),
+                cookiesCount, originsCount);
+        } else {
+            _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
+                "{\"ok\":false,\"storage_state_path\":\"%s\",\"exported\":false,\"error\":\"Export storage state failed\"}\n",
+                JsonEscape(finalPath).c_str());
+        }
         data->response = responseBuf;
     }
     else if (cmd == "session.import") {
         std::string path = JsonGetString(data->json, "path");
-        data->response = "{\"ok\":true,\"session_imported\":true}\n";
+        const char* pathPtr = path.empty() ? nullptr : path.c_str();
+
+        int importedCookies = 0;
+        int importedOrigins = 0;
+        bool ok = SessionManager::GetInstance().ImportSessionState(pathPtr, &importedCookies, &importedOrigins);
+
+        char responseBuf[1024];
+        if (ok) {
+            _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
+                "{\"ok\":true,\"session_imported\":true,\"imported_cookies\":%d,\"imported_origins\":%d}\n",
+                importedCookies, importedOrigins);
+        } else {
+            _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
+                "{\"ok\":false,\"session_imported\":false,\"error\":\"Import session state failed or invalid auth.json\"}\n");
+        }
+        data->response = responseBuf;
     }
     // ── AI Engine Queries ────────────────────────────────────────────
     else if (cmd == "ai.tab_groups") {

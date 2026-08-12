@@ -23,6 +23,10 @@
 
 #include "SessionManager.h"
 #include "../ui/BrowserChrome.h"
+#include "../engine/TierDispatcher.h"
+#include "../engine/AeonEngine_Interface.h"
+#include "nlohmann/json.hpp"
+#include <filesystem>
 #include <windows.h>
 #include <shlobj.h>    // SHGetFolderPath — works Win9x through Win11
 #include <cstdio>
@@ -30,6 +34,8 @@
 #include <ctime>
 #include <string>
 #include <vector>
+
+using json = nlohmann::json;
 
 namespace SessionManager {
 
@@ -68,7 +74,9 @@ static void BuildSessionPath() {
     char dir[MAX_PATH];
     _snprintf_s(dir, sizeof(dir), _TRUNCATE,
         "%s\\DelgadoLogic\\Aeon", appData);
-    CreateDirectoryA(dir, nullptr); // no-op if already exists
+    std::filesystem::path fsDir(dir);
+    std::error_code ec;
+    std::filesystem::create_directories(fsDir, ec);
 
     _snprintf_s(g_SessionPath, sizeof(g_SessionPath), _TRUNCATE,
         "%s\\session.json", dir);
@@ -154,7 +162,7 @@ static void WriteToDisk() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Minimal JSON parser for session.json
+// Robust JSON parser for session.json via nlohmann::json
 // ─────────────────────────────────────────────────────────────────────────────
 static bool ParseSessionFile(std::vector<SessionTab>& outTabs, int& outActiveTab) {
     if (!g_SessionPath[0]) BuildSessionPath();
@@ -177,76 +185,40 @@ static bool ParseSessionFile(std::vector<SessionTab>& outTabs, int& outActiveTab
     fread(&content[0], 1, (size_t)sz, f);
     fclose(f);
 
-    // Parse tabs array — find "url" and "title" fields
-    // This is a purpose-built parser, not a general JSON parser
     outTabs.clear();
     outActiveTab = 0;
 
-    // Find "active_tab" value
-    size_t atPos = content.find("\"active_tab\"");
-    if (atPos != std::string::npos) {
-        size_t colon = content.find(':', atPos);
-        if (colon != std::string::npos) {
-            outActiveTab = atoi(content.c_str() + colon + 1);
+    try {
+        auto j = json::parse(content);
+        if (!j.is_object()) return false;
+
+        if (j.contains("active_tab") && j["active_tab"].is_number()) {
+            outActiveTab = j["active_tab"].get<int>();
         }
-    }
 
-    // Find each tab object { "url":"...", "title":"..." }
-    size_t pos = content.find("\"tabs\"");
-    if (pos == std::string::npos) return false;
-
-    pos = content.find('[', pos);
-    if (pos == std::string::npos) return false;
-
-    // Walk through tab objects
-    while (true) {
-        size_t objStart = content.find('{', pos);
-        if (objStart == std::string::npos) break;
-
-        size_t objEnd = content.find('}', objStart);
-        if (objEnd == std::string::npos) break;
-
-        std::string obj = content.substr(objStart, objEnd - objStart + 1);
-
-        SessionTab st = {};
-
-        // Extract "url":"..."
-        size_t urlKey = obj.find("\"url\"");
-        if (urlKey != std::string::npos) {
-            size_t q1 = obj.find('"', urlKey + 5);
-            size_t q2 = (q1 != std::string::npos) ? obj.find('"', q1 + 1) : std::string::npos;
-            if (q1 != std::string::npos && q2 != std::string::npos) {
-                std::string val = obj.substr(q1 + 1, q2 - q1 - 1);
-                strncpy_s(st.url, val.c_str(), sizeof(st.url) - 1);
+        if (j.contains("tabs") && j["tabs"].is_array()) {
+            for (const auto& item : j["tabs"]) {
+                if (item.is_object()) {
+                    SessionTab st = {};
+                    if (item.contains("url") && item["url"].is_string()) {
+                        std::string u = item["url"].get<std::string>();
+                        strncpy_s(st.url, u.c_str(), sizeof(st.url) - 1);
+                    }
+                    if (item.contains("title") && item["title"].is_string()) {
+                        std::string t = item["title"].get<std::string>();
+                        strncpy_s(st.title, t.c_str(), sizeof(st.title) - 1);
+                    }
+                    if (item.contains("scroll_y") && item["scroll_y"].is_number()) {
+                        st.scrollY = item["scroll_y"].get<int>();
+                    }
+                    if (st.url[0]) {
+                        outTabs.push_back(st);
+                    }
+                }
             }
         }
-
-        // Extract "title":"..."
-        size_t titleKey = obj.find("\"title\"");
-        if (titleKey != std::string::npos) {
-            size_t q1 = obj.find('"', titleKey + 7);
-            size_t q2 = (q1 != std::string::npos) ? obj.find('"', q1 + 1) : std::string::npos;
-            if (q1 != std::string::npos && q2 != std::string::npos) {
-                std::string val = obj.substr(q1 + 1, q2 - q1 - 1);
-                strncpy_s(st.title, val.c_str(), sizeof(st.title) - 1);
-            }
-        }
-
-        // Extract "scroll_y":N
-        size_t scrollKey = obj.find("\"scroll_y\"");
-        if (scrollKey != std::string::npos) {
-            size_t colon = obj.find(':', scrollKey);
-            if (colon != std::string::npos) {
-                st.scrollY = atoi(obj.c_str() + colon + 1);
-            }
-        }
-
-        // Only add if URL is non-empty
-        if (st.url[0]) {
-            outTabs.push_back(st);
-        }
-
-        pos = objEnd + 1;
+    } catch (...) {
+        return false;
     }
 
     fprintf(stdout, "[Session] Parsed %zu tabs from session file\n", outTabs.size());
@@ -343,6 +315,139 @@ bool RestorePreviousSession() {
     // Delete session file after successful restore to avoid crash loops
     DeleteFileA(g_SessionPath);
 
+    return true;
+}
+
+static std::string ResolveAuthJsonPath(const char* json_path) {
+    if (json_path && *json_path) {
+        return std::string(json_path);
+    }
+    char exeDir[MAX_PATH] = {};
+    GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
+    if (char* s = strrchr(exeDir, '\\')) *s = '\0';
+    char defaultPath[MAX_PATH];
+    _snprintf_s(defaultPath, sizeof(defaultPath), _TRUNCATE, "%s\\userDataDir\\auth.json", exeDir);
+    return std::string(defaultPath);
+}
+
+bool ExportSessionState(const char* json_path, int* out_cookies, int* out_origins) {
+    std::string path = ResolveAuthJsonPath(json_path);
+
+    std::filesystem::path fsPath(path);
+    if (fsPath.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(fsPath.parent_path(), ec);
+    }
+
+    AeonEngineVTable* engine = TierDispatcher::GetInstance().GetEngine();
+    if (engine && engine->ExportStorageState) {
+        int ret = engine->ExportStorageState(path.c_str());
+        if (ret < 0) {
+            fprintf(stderr, "[Session] ExportStorageState failed on engine\n");
+            return false;
+        }
+    } else {
+        FILE* f = nullptr;
+        fopen_s(&f, path.c_str(), "w");
+        if (f) {
+            fprintf(f, "{\n  \"cookies\": [],\n  \"origins\": []\n}\n");
+            fclose(f);
+        }
+    }
+
+    int cookieCount = 0;
+    int originCount = 0;
+
+    FILE* f = nullptr;
+    fopen_s(&f, path.c_str(), "r");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (sz > 0 && sz < 10 * 1024 * 1024) {
+            std::string content((size_t)sz, '\0');
+            fread(&content[0], 1, (size_t)sz, f);
+            try {
+                auto j = json::parse(content);
+                if (j.is_object()) {
+                    if (j.contains("cookies") && j["cookies"].is_array()) {
+                        cookieCount = static_cast<int>(j["cookies"].size());
+                    }
+                    if (j.contains("origins") && j["origins"].is_array()) {
+                        originCount = static_cast<int>(j["origins"].size());
+                    }
+                }
+            } catch (...) {}
+        }
+        fclose(f);
+    }
+
+    if (out_cookies) *out_cookies = cookieCount;
+    if (out_origins) *out_origins = originCount;
+
+    fprintf(stdout, "[Session] ExportSessionState completed: path=%s (cookies=%d, origins=%d)\n",
+        path.c_str(), cookieCount, originCount);
+    return true;
+}
+
+bool ImportSessionState(const char* json_path, int* out_cookies, int* out_origins) {
+    std::string path = ResolveAuthJsonPath(json_path);
+
+    int cookieCount = 0;
+    int originCount = 0;
+
+    FILE* f = nullptr;
+    fopen_s(&f, path.c_str(), "r");
+    if (!f) {
+        fprintf(stderr, "[Session] ImportSessionState file not found: %s\n", path.c_str());
+        return false;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (sz <= 0 || sz > 10 * 1024 * 1024) {
+        fclose(f);
+        return false;
+    }
+
+    std::string content((size_t)sz, '\0');
+    fread(&content[0], 1, (size_t)sz, f);
+    fclose(f);
+
+    try {
+        auto j = json::parse(content);
+        if (!j.is_object()) {
+            fprintf(stderr, "[Session] ImportSessionState invalid JSON in file: %s\n", path.c_str());
+            return false;
+        }
+
+        if (j.contains("cookies") && j["cookies"].is_array()) {
+            cookieCount = static_cast<int>(j["cookies"].size());
+        }
+        if (j.contains("origins") && j["origins"].is_array()) {
+            originCount = static_cast<int>(j["origins"].size());
+        }
+    } catch (...) {
+        fprintf(stderr, "[Session] ImportSessionState malformed JSON exception: %s\n", path.c_str());
+        return false;
+    }
+
+    AeonEngineVTable* engine = TierDispatcher::GetInstance().GetEngine();
+    if (engine && engine->ImportStorageState) {
+        int ret = engine->ImportStorageState(path.c_str());
+        if (ret < 0) {
+            fprintf(stderr, "[Session] ImportStorageState returned error\n");
+            return false;
+        }
+    }
+
+    if (out_cookies) *out_cookies = cookieCount;
+    if (out_origins) *out_origins = originCount;
+
+    fprintf(stdout, "[Session] ImportSessionState completed: path=%s (cookies=%d, origins=%d)\n",
+        path.c_str(), cookieCount, originCount);
     return true;
 }
 

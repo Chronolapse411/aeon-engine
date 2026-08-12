@@ -186,6 +186,54 @@ if(AEON_TARGET_TIER STREQUAL "Retro")
     add_dependencies(Aeon aeon_html4)
 endif()
 
+# ---------------------------------------------------------------------------
+# Camoufox C++ Stealth Engine DLL (aeon_gecko_stealth.dll)
+# Built for Pro/Modern/Extended tiers for dynamic domain anti-bot routing.
+# ---------------------------------------------------------------------------
+add_library(aeon_gecko_stealth SHARED
+    engines/gecko_stealth/aeon_gecko_stealth.cpp
+    engines/gecko_stealth/aeon_gecko_stealth.h
+)
+target_compile_definitions(aeon_gecko_stealth PRIVATE AEON_GECKO_STEALTH_EXPORTS)
+target_link_libraries(aeon_gecko_stealth kernel32 user32 gdi32)
+set_target_properties(aeon_gecko_stealth PROPERTIES
+    OUTPUT_NAME "aeon_gecko_stealth"
+    SUFFIX ".dll"
+)
+add_custom_command(TARGET aeon_gecko_stealth POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE:aeon_gecko_stealth>"
+        "$<TARGET_FILE_DIR:Aeon>/aeon_gecko_stealth.dll"
+    COMMENT "[Aeon] Copying aeon_gecko_stealth.dll to output"
+)
+add_dependencies(Aeon aeon_gecko_stealth)
+
+# ---------------------------------------------------------------------------
+# Aeon Local AI Engine DLL (aeon_ai.dll)
+# Built for Pro/Modern/Extended tiers using Gemma 4 / GGUF model formats.
+# ---------------------------------------------------------------------------
+add_library(aeon_ai SHARED
+    engines/aeon_ai.cpp
+    engines/aeon_ai.h
+    core/aeon_component.cpp
+)
+target_compile_definitions(aeon_ai PRIVATE AEON_AI_EXPORTS)
+target_link_libraries(aeon_ai kernel32 user32 gdi32)
+set_target_properties(aeon_ai PROPERTIES
+    OUTPUT_NAME "aeon_ai"
+    SUFFIX ".dll"
+)
+add_custom_command(TARGET aeon_ai POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "$<TARGET_FILE:aeon_ai>"
+        "$<TARGET_FILE_DIR:Aeon>/aeon_ai.dll"
+    COMMENT "[Aeon] Copying aeon_ai.dll to output"
+)
+add_dependencies(Aeon aeon_ai)
+target_link_libraries(Aeon aeon_ai)
+
 install(FILES
     "${CMAKE_SOURCE_DIR}/router/target/release/aeon_router.dll"
     DESTINATION bin OPTIONAL)
+
+

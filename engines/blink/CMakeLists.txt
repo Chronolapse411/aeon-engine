@@ -44,6 +44,11 @@ target_compile_definitions(aeon_blink PRIVATE
     NOMINMAX
 )
 
+target_compile_features(aeon_blink PRIVATE cxx_std_17)
+if(MSVC)
+    target_compile_options(aeon_blink PRIVATE /std:c++17 /EHsc)
+endif()
+
 # Include paths
 target_include_directories(aeon_blink PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../core/engine"     # AeonEngine_Interface.h
@@ -56,10 +61,9 @@ target_include_directories(aeon_blink PRIVATE
 # Link libraries
 target_link_directories(aeon_blink PRIVATE "${WV2_LIB_DIR}")
 target_link_libraries(aeon_blink PRIVATE
-    WebView2LoaderStatic    # Static link — no WebView2Loader.dll dependency
-    kernel32 user32 gdi32 shell32 ole32 oleaut32
-    shlwapi advapi32
-    crypt32                 # DPAPI — NativePassMgr::StoreCredential
+    "${WV2_LIB_DIR}/WebView2LoaderStatic.lib"
+    kernel32.lib user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib
+    shlwapi.lib advapi32.lib crypt32.lib
 )
 
 # Output name

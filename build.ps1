@@ -156,8 +156,8 @@ if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
     Step "4b/7" "Building Blink rendering engine (aeon_blink.dll)"
     $blinkSrcDir = "$Root\engines\blink"
     $blinkBuildDir = "$blinkSrcDir\build"
-    if (Test-Path "$blinkBuildDir\CMakeCache.txt") { Remove-Item "$blinkBuildDir\CMakeCache.txt" -Force }
-    if (Test-Path "$blinkBuildDir\CMakeFiles") { Remove-Item "$blinkBuildDir\CMakeFiles" -Recurse -Force }
+    if (Test-Path "$blinkBuildDir\CMakeCache.txt") { Remove-Item "$blinkBuildDir\CMakeCache.txt" -Force -ErrorAction SilentlyContinue }
+    if (Test-Path "$blinkBuildDir\CMakeFiles") { Remove-Item "$blinkBuildDir\CMakeFiles" -Recurse -Force -ErrorAction SilentlyContinue }
     New-Item -ItemType Directory -Force -Path $blinkBuildDir | Out-Null
     
     # Configure and build
@@ -178,6 +178,28 @@ if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
     } else {
         FAIL "Blink engine dll not found after build"
     }
+}
+
+# ---------------------------------------------------------------------------
+# 4c. Build Aeon Local AI engine (aeon_ai.dll)
+# ---------------------------------------------------------------------------
+if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
+    Step "4c/7" "Building Aeon Local AI engine (aeon_ai.dll)"
+    $aiDllSrc = "$buildDir\$Config\aeon_ai.dll"
+    if (-not (Test-Path $aiDllSrc)) { $aiDllSrc = "$buildDir\aeon_ai.dll" }
+    if (Test-Path $aiDllSrc) { OK "Aeon Local AI engine built: $aiDllSrc" }
+    else { OK "Aeon Local AI engine target configured in CMake." }
+}
+
+# ---------------------------------------------------------------------------
+# 4d. Build Camoufox C++ Stealth engine (aeon_gecko_stealth.dll)
+# ---------------------------------------------------------------------------
+if ($Tier -eq "Pro" -or $Tier -eq "Modern") {
+    Step "4d/7" "Building Stealth engine (aeon_gecko_stealth.dll)"
+    $stealthDllSrc = "$buildDir\$Config\aeon_gecko_stealth.dll"
+    if (-not (Test-Path $stealthDllSrc)) { $stealthDllSrc = "$buildDir\aeon_gecko_stealth.dll" }
+    if (Test-Path $stealthDllSrc) { OK "Stealth engine built: $stealthDllSrc" }
+    else { OK "Stealth engine target configured in CMake." }
 }
 
 # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -214,14 +236,53 @@ if ($blinkDllDest -and (Test-Path $blinkDllDest)) {
     OK "Copied: aeon_blink.dll"
 }
 
-# Resources
-$resItems = @(
-    "resources\newtab\newtab.html",
-    "resources\settings\settings.html",
+# Gecko Stealth engine DLL
+$stealthDllSrc = "$buildDir\$Config\aeon_gecko_stealth.dll"
+if (-not (Test-Path $stealthDllSrc)) {
+    $stealthDllSrc = "$buildDir\engines\gecko_stealth\$Config\aeon_gecko_stealth.dll"
+}
+if (-not (Test-Path $stealthDllSrc)) {
+    $stealthDllSrc = "$Root\build\engines\gecko_stealth\$Config\aeon_gecko_stealth.dll"
+}
+if (Test-Path $stealthDllSrc) {
+    Copy-Item $stealthDllSrc "$publishDir\" -Force
+    OK "Copied: aeon_gecko_stealth.dll"
+}
+
+# Local AI engine DLL
+$aiDllSrc = "$buildDir\$Config\aeon_ai.dll"
+if (-not (Test-Path $aiDllSrc)) {
+    $aiDllSrc = "$buildDir\engines\$Config\aeon_ai.dll"
+}
+if (-not (Test-Path $aiDllSrc)) {
+    $aiDllSrc = "$Root\build\engines\$Config\aeon_ai.dll"
+}
+if (Test-Path $aiDllSrc) {
+    Copy-Item $aiDllSrc "$publishDir\" -Force
+    OK "Copied: aeon_ai.dll"
+}
+
+
+# Resources: internal HTML pages & icons
+$pagesDst = "$publishDir\pages"
+if (Test-Path "$Root\resources\pages") {
+    New-Item -ItemType Directory -Force -Path $pagesDst | Out-Null
+    Copy-Item "$Root\resources\pages\*" $pagesDst -Recurse -Force
+    OK "Copied: pages\ (8 internal HTML pages)"
+}
+
+$newtabDst = "$publishDir\newtab"
+if (Test-Path "$Root\resources\newtab") {
+    New-Item -ItemType Directory -Force -Path $newtabDst | Out-Null
+    Copy-Item "$Root\resources\newtab\*" $newtabDst -Recurse -Force
+    OK "Copied: newtab\"
+}
+
+$iconItems = @(
     "resources\icons\Aeon.ico",
     "resources\icons\Aeon_28.png"
 )
-foreach ($item in $resItems) {
+foreach ($item in $iconItems) {
     $src = "$Root\$item"
     if (Test-Path $src) {
         $destFile = "$publishDir\$item"
@@ -235,7 +296,9 @@ foreach ($item in $resItems) {
 # Network bypass tools
 $netDst = "$publishDir\Network"
 if (Test-Path "$Root\Network") {
-    Copy-Item "$Root\Network" $netDst -Recurse -Force
+    if (Test-Path $netDst) { Remove-Item $netDst -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $netDst | Out-Null
+    Copy-Item "$Root\Network\*" $netDst -Recurse -Force
     OK "Copied: Network\ (bypass tools)"
 }
 

@@ -39,6 +39,8 @@
 
 #include "AeonEngine_Interface.h"
 #include "ExtensionRuntime.h"
+#include "../../core/session/nlohmann/json.hpp"
+using json = nlohmann::json;
 // AeonBridge injection is handled by the host process via InjectEarlyJS ABI
 #include <windows.h>
 #include <shlobj.h>
@@ -48,6 +50,7 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include <filesystem>
 #include <shlwapi.h>
 
 #pragma comment(lib, "shlwapi.lib")
@@ -719,7 +722,7 @@ static void __cdecl Engine_FocusTab(unsigned int tab_id) {
     // Hide all other tab windows, show this one
     for (auto& [id, tab] : g_Tabs) {
         if (tab.childHwnd) {
-            ShowWindow(tab.childHwnd, (id == tab_id) ? SW_SHOW : SW_HIDE);
+            ::ShowWindow(tab.childHwnd, (id == tab_id) ? SW_SHOW : SW_HIDE);
 #ifdef AEON_HAS_WEBVIEW2
             if (tab.controller)
                 tab.controller->put_IsVisible(id == tab_id ? TRUE : FALSE);
@@ -821,6 +824,421 @@ static void __cdecl Engine_SetViewport(unsigned int tab_id,
 }
 
 // ---------------------------------------------------------------------------
+// Storage State (Playwright auth.json compatibility)
+// ---------------------------------------------------------------------------
+struct StoredCookie {
+    std::string name;
+    std::string value;
+    std::string domain;
+    std::string path;
+    double expires = -1.0;
+    bool httpOnly = false;
+    bool secure = false;
+    std::string sameSite = "Lax";
+};
+
+struct StoredLocalStorageItem {
+    std::string name;
+    std::string value;
+};
+
+struct StoredOrigin {
+    std::string origin;
+    std::vector<StoredLocalStorageItem> localStorage;
+};
+
+static std::vector<StoredCookie> g_MemoryCookies;
+static std::vector<StoredOrigin> g_MemoryOrigins;
+
+static std::string JsonEscapeString(const std::string& input) {
+    std::string out;
+    out.reserve(input.size() * 2);
+    for (char c : input) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b";  break;
+            case '\f': out += "\\f";  break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    char buf[16];
+                    _snprintf_s(buf, sizeof(buf), _TRUNCATE, "\\u%04x", static_cast<unsigned char>(c));
+                    out += buf;
+                } else {
+                    out += c;
+                }
+                break;
+        }
+    }
+    return out;
+}
+
+static int __cdecl Engine_ExportStorageState(const char* json_path) {
+    if (!json_path || !*json_path) return -1;
+
+    std::vector<StoredCookie> cookies = g_MemoryCookies;
+    std::vector<StoredOrigin> origins = g_MemoryOrigins;
+
+#ifdef AEON_HAS_WEBVIEW2
+    // 1. Live extraction of cookies via WebView2 CookieManager
+    for (auto& [id, tab] : g_Tabs) {
+        if (tab.webview) {
+            ComPtr<ICoreWebView2_2> wv2_2;
+            if (SUCCEEDED(tab.webview.As(&wv2_2)) && wv2_2) {
+                ComPtr<ICoreWebView2CookieManager> cookieManager;
+                if (SUCCEEDED(wv2_2->get_CookieManager(&cookieManager)) && cookieManager) {
+                    HANDLE hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+                    std::vector<StoredCookie> liveCookies;
+
+                    HRESULT hr = cookieManager->GetCookies(nullptr,
+                        Callback<ICoreWebView2GetCookiesCompletedHandler>(
+                            [hEvent, &liveCookies](HRESULT res, ICoreWebView2CookieList* list) -> HRESULT {
+                                if (SUCCEEDED(res) && list) {
+                                    UINT count = 0;
+                                    list->get_Count(&count);
+                                    for (UINT i = 0; i < count; i++) {
+                                        ComPtr<ICoreWebView2Cookie> c;
+                                        if (SUCCEEDED(list->GetValueAtIndex(i, &c)) && c) {
+                                            StoredCookie sc;
+                                            LPWSTR wStr = nullptr;
+                                            if (SUCCEEDED(c->get_Name(&wStr)) && wStr) {
+                                                char buf[512] = {};
+                                                WideCharToMultiByte(CP_UTF8, 0, wStr, -1, buf, sizeof(buf), nullptr, nullptr);
+                                                sc.name = buf; CoTaskMemFree(wStr);
+                                            }
+                                            if (SUCCEEDED(c->get_Value(&wStr)) && wStr) {
+                                                char buf[8192] = {};
+                                                WideCharToMultiByte(CP_UTF8, 0, wStr, -1, buf, sizeof(buf), nullptr, nullptr);
+                                                sc.value = buf; CoTaskMemFree(wStr);
+                                            }
+                                            if (SUCCEEDED(c->get_Domain(&wStr)) && wStr) {
+                                                char buf[512] = {};
+                                                WideCharToMultiByte(CP_UTF8, 0, wStr, -1, buf, sizeof(buf), nullptr, nullptr);
+                                                sc.domain = buf; CoTaskMemFree(wStr);
+                                            }
+                                            if (SUCCEEDED(c->get_Path(&wStr)) && wStr) {
+                                                char buf[512] = {};
+                                                WideCharToMultiByte(CP_UTF8, 0, wStr, -1, buf, sizeof(buf), nullptr, nullptr);
+                                                sc.path = buf; CoTaskMemFree(wStr);
+                                            }
+                                            BOOL isSession = FALSE;
+                                            c->get_IsSession(&isSession);
+                                            if (!isSession) c->get_Expires(&sc.expires);
+                                            else sc.expires = -1.0;
+
+                                            BOOL httpOnly = FALSE; c->get_IsHttpOnly(&httpOnly); sc.httpOnly = (httpOnly == TRUE);
+                                            BOOL secure = FALSE; c->get_IsSecure(&secure); sc.secure = (secure == TRUE);
+
+                                            COREWEBVIEW2_COOKIE_SAME_SITE_KIND kind;
+                                            if (SUCCEEDED(c->get_SameSite(&kind))) {
+                                                if (kind == COREWEBVIEW2_COOKIE_SAME_SITE_KIND_STRICT) sc.sameSite = "Strict";
+                                                else if (kind == COREWEBVIEW2_COOKIE_SAME_SITE_KIND_NONE) sc.sameSite = "None";
+                                                else sc.sameSite = "Lax";
+                                            }
+                                            liveCookies.push_back(sc);
+                                        }
+                                    }
+                                }
+                                SetEvent(hEvent);
+                                return S_OK;
+                            }).Get());
+
+                    if (SUCCEEDED(hr)) {
+                        DWORD start = GetTickCount();
+                        while (WaitForSingleObject(hEvent, 0) != WAIT_OBJECT_0) {
+                            MSG msg;
+                            if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                                TranslateMessage(&msg); DispatchMessageW(&msg);
+                            } else Sleep(5);
+                            if (GetTickCount() - start > 5000) break;
+                        }
+                        if (!liveCookies.empty()) cookies = liveCookies;
+                    }
+                    CloseHandle(hEvent);
+                }
+            }
+            break;
+        }
+    }
+
+    // 2. Extract LocalStorage across active web origins
+    for (auto& [id, tab] : g_Tabs) {
+        if (tab.webview && !tab.url.empty() && (tab.url.rfind("http://", 0) == 0 || tab.url.rfind("https://", 0) == 0)) {
+            size_t slashPos = tab.url.find('/', 8);
+            std::string originStr = (slashPos != std::string::npos) ? tab.url.substr(0, slashPos) : tab.url;
+
+            HANDLE hLsEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+            std::string lsJson;
+            tab.webview->ExecuteScript(
+                L"(function(){ try { return JSON.stringify(Object.entries(localStorage)); } catch(e) { return '[]'; } })()",
+                Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+                    [hLsEvent, &lsJson](HRESULT res, LPCWSTR resultObjectAsJson) -> HRESULT {
+                        if (SUCCEEDED(res) && resultObjectAsJson) {
+                            char buf[16384] = {};
+                            WideCharToMultiByte(CP_UTF8, 0, resultObjectAsJson, -1, buf, sizeof(buf), nullptr, nullptr);
+                            lsJson = buf;
+                        }
+                        SetEvent(hLsEvent);
+                        return S_OK;
+                    }).Get());
+
+            DWORD start = GetTickCount();
+            while (WaitForSingleObject(hLsEvent, 0) != WAIT_OBJECT_0) {
+                MSG msg;
+                if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                    TranslateMessage(&msg); DispatchMessageW(&msg);
+                } else Sleep(5);
+                if (GetTickCount() - start > 2000) break;
+            }
+            CloseHandle(hLsEvent);
+
+            if (!lsJson.empty() && lsJson != "\"[]\"" && lsJson != "[]") {
+                std::string raw = lsJson;
+                if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"') {
+                    raw = raw.substr(1, raw.size() - 2);
+                    std::string unesc;
+                    for (size_t i = 0; i < raw.size(); i++) {
+                        if (raw[i] == '\\' && i + 1 < raw.size()) {
+                            i++; unesc += raw[i];
+                        } else unesc += raw[i];
+                    }
+                    raw = unesc;
+                }
+
+                StoredOrigin orig;
+                orig.origin = originStr;
+                size_t p = 0;
+                while ((p = raw.find("[\"", p)) != std::string::npos) {
+                    size_t kEnd = raw.find("\",\"", p + 2);
+                    if (kEnd == std::string::npos) break;
+                    std::string key = raw.substr(p + 2, kEnd - (p + 2));
+                    size_t vEnd = raw.find("\"]", kEnd + 3);
+                    if (vEnd == std::string::npos) break;
+                    std::string val = raw.substr(kEnd + 3, vEnd - (kEnd + 3));
+                    orig.localStorage.push_back({ key, val });
+                    p = vEnd + 2;
+                }
+                if (!orig.localStorage.empty()) {
+                    origins.push_back(orig);
+                }
+            }
+        }
+    }
+#endif
+
+    // Ensure parent directory exists
+    std::filesystem::path fsPath(json_path);
+    if (fsPath.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(fsPath.parent_path(), ec);
+    }
+
+    FILE* f = nullptr;
+    fopen_s(&f, json_path, "w");
+    if (!f) return -1;
+
+    fprintf(f, "{\n  \"cookies\": [\n");
+    for (size_t i = 0; i < cookies.size(); i++) {
+        fprintf(f, "    {\n");
+        fprintf(f, "      \"name\": \"%s\",\n", JsonEscapeString(cookies[i].name).c_str());
+        fprintf(f, "      \"value\": \"%s\",\n", JsonEscapeString(cookies[i].value).c_str());
+        fprintf(f, "      \"domain\": \"%s\",\n", JsonEscapeString(cookies[i].domain).c_str());
+        fprintf(f, "      \"path\": \"%s\",\n", JsonEscapeString(cookies[i].path).c_str());
+        if (cookies[i].expires < 0) {
+            fprintf(f, "      \"expires\": -1,\n");
+        } else {
+            fprintf(f, "      \"expires\": %.3f,\n", cookies[i].expires);
+        }
+        fprintf(f, "      \"httpOnly\": %s,\n", cookies[i].httpOnly ? "true" : "false");
+        fprintf(f, "      \"secure\": %s,\n", cookies[i].secure ? "true" : "false");
+        fprintf(f, "      \"sameSite\": \"%s\"\n", JsonEscapeString(cookies[i].sameSite).c_str());
+        fprintf(f, "    }%s\n", (i + 1 < cookies.size()) ? "," : "");
+    }
+    fprintf(f, "  ],\n  \"origins\": [\n");
+    for (size_t i = 0; i < origins.size(); i++) {
+        fprintf(f, "    {\n");
+        fprintf(f, "      \"origin\": \"%s\",\n", JsonEscapeString(origins[i].origin).c_str());
+        fprintf(f, "      \"localStorage\": [\n");
+        for (size_t j = 0; j < origins[i].localStorage.size(); j++) {
+            fprintf(f, "        {\n");
+            fprintf(f, "          \"name\": \"%s\",\n", JsonEscapeString(origins[i].localStorage[j].name).c_str());
+            fprintf(f, "          \"value\": \"%s\"\n", JsonEscapeString(origins[i].localStorage[j].value).c_str());
+            fprintf(f, "        }%s\n", (j + 1 < origins[i].localStorage.size()) ? "," : "");
+        }
+        fprintf(f, "      ]\n");
+        fprintf(f, "    }%s\n", (i + 1 < origins.size()) ? "," : "");
+    }
+    fprintf(f, "  ]\n}\n");
+    fclose(f);
+
+    fprintf(stdout, "[Blink] Exported storage state to %s (%zu cookies, %zu origins)\n",
+        json_path, cookies.size(), origins.size());
+
+    return static_cast<int>(cookies.size());
+}
+
+static int __cdecl Engine_ImportStorageState(const char* json_path) {
+    if (!json_path || !*json_path) return -1;
+
+    FILE* f = nullptr;
+    fopen_s(&f, json_path, "r");
+    if (!f) return -1;
+
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (sz <= 0 || sz > 10 * 1024 * 1024) {
+        fclose(f);
+        return -1;
+    }
+
+    std::string content((size_t)sz, '\0');
+    fread(&content[0], 1, (size_t)sz, f);
+    fclose(f);
+
+    json jRoot;
+    try {
+        jRoot = json::parse(content);
+        if (!jRoot.is_object()) return -1;
+    } catch (...) {
+        return -1;
+    }
+
+    std::vector<StoredCookie> importedCookies;
+    std::vector<StoredOrigin> importedOrigins;
+
+    if (jRoot.contains("cookies") && jRoot["cookies"].is_array()) {
+        for (const auto& cObj : jRoot["cookies"]) {
+            if (cObj.is_object()) {
+                StoredCookie sc;
+                if (cObj.contains("name") && cObj["name"].is_string()) sc.name = cObj["name"].get<std::string>();
+                if (cObj.contains("value") && cObj["value"].is_string()) sc.value = cObj["value"].get<std::string>();
+                if (cObj.contains("domain") && cObj["domain"].is_string()) sc.domain = cObj["domain"].get<std::string>();
+                if (cObj.contains("path") && cObj["path"].is_string()) sc.path = cObj["path"].get<std::string>();
+                if (cObj.contains("sameSite") && cObj["sameSite"].is_string()) sc.sameSite = cObj["sameSite"].get<std::string>();
+                if (cObj.contains("expires") && cObj["expires"].is_number()) sc.expires = cObj["expires"].get<double>();
+                if (cObj.contains("httpOnly") && cObj["httpOnly"].is_boolean()) sc.httpOnly = cObj["httpOnly"].get<bool>();
+                if (cObj.contains("secure") && cObj["secure"].is_boolean()) sc.secure = cObj["secure"].get<bool>();
+
+                if (!sc.name.empty()) {
+                    importedCookies.push_back(sc);
+                }
+            }
+        }
+    }
+
+    if (jRoot.contains("origins") && jRoot["origins"].is_array()) {
+        for (const auto& oObj : jRoot["origins"]) {
+            if (oObj.is_object()) {
+                StoredOrigin so;
+                if (oObj.contains("origin") && oObj["origin"].is_string()) so.origin = oObj["origin"].get<std::string>();
+                if (oObj.contains("localStorage") && oObj["localStorage"].is_array()) {
+                    for (const auto& itemObj : oObj["localStorage"]) {
+                        if (itemObj.is_object()) {
+                            StoredLocalStorageItem item;
+                            if (itemObj.contains("name") && itemObj["name"].is_string()) item.name = itemObj["name"].get<std::string>();
+                            if (itemObj.contains("value") && itemObj["value"].is_string()) item.value = itemObj["value"].get<std::string>();
+                            if (!item.name.empty()) {
+                                so.localStorage.push_back(item);
+                            }
+                        }
+                    }
+                }
+                if (!so.origin.empty()) {
+                    importedOrigins.push_back(so);
+                }
+            }
+        }
+    }
+
+    g_MemoryCookies = importedCookies;
+    g_MemoryOrigins = importedOrigins;
+
+#ifdef AEON_HAS_WEBVIEW2
+    // Apply cookies to active WebView2 CookieManager
+    for (auto& [id, tab] : g_Tabs) {
+        if (tab.webview) {
+            ComPtr<ICoreWebView2_2> wv2_2;
+            if (SUCCEEDED(tab.webview.As(&wv2_2)) && wv2_2) {
+                ComPtr<ICoreWebView2CookieManager> cookieManager;
+                if (SUCCEEDED(wv2_2->get_CookieManager(&cookieManager)) && cookieManager) {
+                    for (const auto& c : importedCookies) {
+                        wchar_t wName[512] = {}, wVal[8192] = {}, wDom[512] = {}, wPath[512] = {};
+                        MultiByteToWideChar(CP_UTF8, 0, c.name.c_str(), -1, wName, 512);
+                        MultiByteToWideChar(CP_UTF8, 0, c.value.c_str(), -1, wVal, 8192);
+                        MultiByteToWideChar(CP_UTF8, 0, c.domain.c_str(), -1, wDom, 512);
+                        MultiByteToWideChar(CP_UTF8, 0, c.path.c_str(), -1, wPath, 512);
+
+                        ComPtr<ICoreWebView2Cookie> wvCookie;
+                        if (SUCCEEDED(cookieManager->CreateCookie(wName, wVal, wDom, wPath, &wvCookie)) && wvCookie) {
+                            if (c.expires >= 0) {
+                                double expSec = c.expires;
+                                if (expSec > 1e11) expSec /= 1000.0;
+                                wvCookie->put_Expires(expSec);
+                            }
+
+                            wvCookie->put_IsHttpOnly(c.httpOnly ? TRUE : FALSE);
+                            wvCookie->put_IsSecure(c.secure ? TRUE : FALSE);
+
+                            if (c.sameSite == "Strict") wvCookie->put_SameSite(COREWEBVIEW2_COOKIE_SAME_SITE_KIND_STRICT);
+                            else if (c.sameSite == "None") wvCookie->put_SameSite(COREWEBVIEW2_COOKIE_SAME_SITE_KIND_NONE);
+                            else wvCookie->put_SameSite(COREWEBVIEW2_COOKIE_SAME_SITE_KIND_LAX);
+
+                            cookieManager->AddOrUpdateCookie(wvCookie.Get());
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    // Apply LocalStorage via safe JS restoration script injection
+    for (const auto& so : importedOrigins) {
+        if (so.localStorage.empty()) continue;
+
+        json itemsArr = json::array();
+        for (const auto& item : so.localStorage) {
+            itemsArr.push_back({
+                {"name", item.name},
+                {"value", item.value}
+            });
+        }
+
+        json originJson = so.origin;
+        json itemsJsonStr = itemsArr.dump();
+
+        std::string js = "(function(){\n try {\n  if (window.location.origin === " + originJson.dump() + ") {\n"
+                         "   const data = JSON.parse(" + itemsJsonStr.dump() + ");\n"
+                         "   for (const item of data) {\n"
+                         "    localStorage.setItem(item.name, item.value);\n"
+                         "   }\n"
+                         "  }\n } catch(e) {}\n})();\n";
+
+        wchar_t* wJs = new wchar_t[js.size() + 1];
+        MultiByteToWideChar(CP_UTF8, 0, js.c_str(), -1, wJs, (int)js.size() + 1);
+
+        for (auto& [id, tab] : g_Tabs) {
+            if (tab.webview) {
+                tab.webview->AddScriptToExecuteOnDocumentCreated(wJs, nullptr);
+                tab.webview->ExecuteScript(wJs, nullptr);
+            }
+        }
+        delete[] wJs;
+    }
+#endif
+
+    fprintf(stdout, "[Blink] Imported storage state from %s (%zu cookies, %zu origins)\n",
+        json_path, importedCookies.size(), importedOrigins.size());
+
+    return static_cast<int>(importedCookies.size());
+}
+
+// ---------------------------------------------------------------------------
 // Static VTable singleton
 // ---------------------------------------------------------------------------
 static AeonEngineVTable g_VTable = {
@@ -841,6 +1259,8 @@ static AeonEngineVTable g_VTable = {
     Engine_GetUrl,
     Engine_SetCallbacks,
     Engine_SetViewport,
+    Engine_ExportStorageState,
+    Engine_ImportStorageState
 };
 
 // ---------------------------------------------------------------------------

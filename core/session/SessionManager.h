@@ -23,6 +23,26 @@ namespace SessionManager {
     // Creates tabs via BrowserChrome::CreateTab.
     bool RestorePreviousSession();
 
+    // Export storage state (cookies + LocalStorage) in Playwright auth.json format.
+    // Default path: %MODULE_DIR%\userDataDir\auth.json
+    bool ExportSessionState(const char* json_path = nullptr, int* out_cookies = nullptr, int* out_origins = nullptr);
+
+    // Import storage state from Playwright auth.json format into browser profile.
+    // Default path: %MODULE_DIR%\userDataDir\auth.json
+    bool ImportSessionState(const char* json_path = nullptr, int* out_cookies = nullptr, int* out_origins = nullptr);
+
+    class Instance {
+    public:
+        static Instance& GetInstance() { static Instance inst; return inst; }
+        bool ExportSessionState(const char* json_path = nullptr, int* out_cookies = nullptr, int* out_origins = nullptr) {
+            return SessionManager::ExportSessionState(json_path, out_cookies, out_origins);
+        }
+        bool ImportSessionState(const char* json_path = nullptr, int* out_cookies = nullptr, int* out_origins = nullptr) {
+            return SessionManager::ImportSessionState(json_path, out_cookies, out_origins);
+        }
+    };
+    inline Instance& GetInstance() { return Instance::GetInstance(); }
+
     // Autosave timer ID — check against this in WM_TIMER handler.
     static const UINT_PTR AUTOSAVE_TIMER_ID = 0xAE05;
 }
