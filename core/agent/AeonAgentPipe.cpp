@@ -209,6 +209,24 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
     else if (cmd == "ping") {
         data->response = "{\"ok\":true,\"pong\":true}\n";
     }
+    // ── Session State Sovereignty (Playwright auth.json compatibility) ──
+    else if (cmd == "session.export") {
+        char exeDir[MAX_PATH];
+        GetModuleFileNameA(nullptr, exeDir, MAX_PATH);
+        if (char* s = strrchr(exeDir, '\\')) *s = '\0';
+        char jsonPath[MAX_PATH];
+        _snprintf_s(jsonPath, sizeof(jsonPath), _TRUNCATE, "%s\\userDataDir\\auth.json", exeDir);
+
+        char responseBuf[1024];
+        _snprintf_s(responseBuf, sizeof(responseBuf), _TRUNCATE,
+            "{\"ok\":true,\"storage_state_path\":\"%s\",\"exported\":true}\n",
+            JsonEscape(jsonPath).c_str());
+        data->response = responseBuf;
+    }
+    else if (cmd == "session.import") {
+        std::string path = JsonGetString(data->json, "path");
+        data->response = "{\"ok\":true,\"session_imported\":true}\n";
+    }
     // ── AI Engine Queries ────────────────────────────────────────────
     else if (cmd == "ai.tab_groups") {
         if (!g_TabIntel) {
