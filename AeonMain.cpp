@@ -630,6 +630,7 @@ LRESULT CALLBACK AeonWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             return 0;
 
         case WM_DESTROY:
+            AeonAgentPipe::Stop();
             BrowserChrome::Destroy(hWnd);
             PostQuitMessage(0);
             return 0;
