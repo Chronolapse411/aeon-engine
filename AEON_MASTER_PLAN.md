@@ -263,6 +263,14 @@ node-llama-cpp locally running GGUF models: **No OpenAI. No Azure. No Cloud APIs
 - [x] **Frontend JSON parsing** — `bookmarks.html` + `passwords.html` consume JSON string responses with field normalization.
 - [x] **Build #8 verified** — `Aeon.exe` 1.78 MB + `aeon_blink.dll` 136 KB + `aeon_router.dll` 440 KB. All 8 validation tests passed on GCP `n2-standard-8` Spot VM.
 
+### Native Agentic Control & Session Sovereignty (Session 35 — August 2026)
+- [x] **Agentic IPC Control Pipe (`\\.\pipe\aeon-agent`)** — Wired `WM_AEON_AGENT` (`WM_USER + 0x7B0`) in `AeonMain.cpp` and `AeonAgentPipe.cpp`. Supports `browser.info`, `tab.list`, `tab.new`, `tab.navigate`, `tab.focus`, `tab.close`, `window.bounds`, `window.maximize`, `window.restore`.
+- [x] **Playwright `auth.json` Session Sovereignty** — Added `session.export` and `session.import` IPC commands for one-click cookie & LocalStorage state export/import.
+- [x] **100% Pure Webview Canvas Architecture** — Set `CHROME_H = 0` in `BrowserChrome.cpp`. Eliminated legacy 72px Win32 GDI top bar for 100% window viewport coverage.
+- [x] **IPC Thread Teardown Fix** — Added `AeonAgentPipe::Stop()` inside `WM_DESTROY` in `AeonMain.cpp`, resolving `Unknown Hard Error` process exit popups.
+- [x] **Google Gemma 4 Integration** — Adopted Google's Gemma 4 (Apache 2.0, released April 2026, encoder-free multimodal text/vision/audio, 256K context, GGUF/Ollama support) as primary on-device model for `aeon_ai.dll`.
+- [x] **Camoufox C++ Stealth Engine Architecture** — Master Plan designed for `aeon_gecko_stealth.dll` C++ Firefox anti-detect engine with dynamic domain routing in `TierDispatcher.cpp` (bypassing Cloudflare Turnstile & Google OAuth).
+
 ### Aeon Codebase (Legacy)
 - [x] **Aeon Installer** — NSIS/Inno Setup fetch/verification complete.
 - [x] `LogicFlow v0.1.0-foundation` GitHub release generated and matched with Aeon integrations.
