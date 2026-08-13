@@ -10,6 +10,7 @@
 //             Added __cdecl calling convention for ABI compliance.
 
 #include <windows.h>
+#pragma execution_character_set("utf-8")
 #include <windowsx.h>
 #include <dwmapi.h>
 #include <shlobj.h>
@@ -105,11 +106,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     AeonLog::Init();
     AeonCrash::AddBreadcrumb("boot", "logger_initialized");
 
-    fprintf(stdout, "\n");
-    fprintf(stdout, "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n");
-    fprintf(stdout, "\u2551  Aeon Browser  \u2014  by DelgadoLogic    \u2551\n");
-    fprintf(stdout, "\u2551  browseaeon.com              \u2551\n");
-    fprintf(stdout, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n");
+    fputws(L"\n", stdout);
+    fputws(L"\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n", stdout);
+    fputws(L"\u2551  Aeon Browser  \u2014  by DelgadoLogic    \u2551\n", stdout);
+    fputws(L"\u2551  browseaeon.com              \u2551\n", stdout);
+    fputws(L"\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n", stdout);
 
     // PHASE 1: Hardware probe — detect OS tier + CPU
     AeonCrash::SetKey("boot_phase", "hardware_probe");
@@ -192,20 +193,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nShowCmd) {
     // 5. Load rendering engine DLL for this tier
     AeonEngineVTable* engine = TierDispatcher_LoadEngine(&profile);
     if (!engine) {
-        MessageBoxA(nullptr,
-            "Aeon could not load a rendering engine for your system.\n"
-            "Please visit browseaeon.com for troubleshooting.",
-            "Aeon Browser \u2014 Engine Error", MB_ICONERROR);
+        MessageBoxW(nullptr,
+            L"Aeon could not load a rendering engine for your system.\n"
+            L"Please visit browseaeon.com for troubleshooting.",
+            L"Aeon Browser \u2014 Engine Error", MB_ICONERROR);
         return 1;
     }
     g_Engine = engine;
 
     // Initialize the engine (creates COM apartment, WebView2 env, etc.)
     if (!engine->Init(&profile, hInstance)) {
-        MessageBoxA(nullptr,
-            "Aeon rendering engine failed to initialize.\n"
-            "Ensure Microsoft Edge WebView2 Runtime is installed.",
-            "Aeon Browser \u2014 Engine Error", MB_ICONERROR);
+        MessageBoxW(nullptr,
+            L"Aeon rendering engine failed to initialize.\n"
+            L"Ensure Microsoft Edge WebView2 Runtime is installed.",
+            L"Aeon Browser \u2014 Engine Error", MB_ICONERROR);
         return 1;
     }
 
