@@ -448,6 +448,9 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
     }
     else if (cmd == "ai.navigate_intent") {
         std::string intent = JsonGetString(data->json, "intent");
+        if (intent.length() > 2000) {
+            intent = intent.substr(0, 2000);
+        }
         int tabId = JsonGetInt(data->json, "tab_id");
 
         std::string targetUrl;
@@ -512,15 +515,23 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
         std::string intentClass = AeonAIInstance().DetectIntentLLM("", goal, "");
         std::string actJson = AeonBridge::StagehandAct(tabId, "click", 1, "");
 
+        auto sanitizeNdjson = [](std::string s) -> std::string {
+            while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+            return s;
+        };
+
+        std::string cleanObs = sanitizeNdjson(obsJson);
+        std::string cleanAct = sanitizeNdjson(actJson);
+
         std::ostringstream ss;
         ss << "{\"ok\":true,\"goal\":\"" << JsonEscape(goal.c_str()) << "\""
            << ",\"status\":\"completed\""
            << ",\"intent_classified\":\"" << JsonEscape(intentClass.c_str()) << "\""
            << ",\"steps\":[\"observe\",\"plan\",\"act\",\"validate\"]"
            << ",\"step_history\":["
-           << "{\"step\":1,\"phase\":\"observe\",\"result\":" << (obsJson.empty() ? "{}" : obsJson) << "},"
+           << "{\"step\":1,\"phase\":\"observe\",\"result\":" << (cleanObs.empty() ? "{}" : cleanObs) << "},"
            << "{\"step\":2,\"phase\":\"plan\",\"chosen_action\":\"click\",\"target_ref\":1},"
-           << "{\"step\":3,\"phase\":\"act\",\"result\":" << (actJson.empty() ? "{}" : actJson) << "},"
+           << "{\"step\":3,\"phase\":\"act\",\"result\":" << (cleanAct.empty() ? "{}" : cleanAct) << "},"
            << "{\"step\":4,\"phase\":\"validate\",\"success\":true}"
            << "]"
            << ",\"result\":{\"success\":true}}\n";

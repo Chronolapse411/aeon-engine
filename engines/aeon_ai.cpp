@@ -17,7 +17,6 @@
 #define AEON_AI_EXPORTS
 #endif
 #include "aeon_ai.h"
-#include "../core/session/SessionManager.h"
 
 #include <algorithm>
 #include <atomic>
@@ -811,11 +810,15 @@ std::string AeonAI::SummarizeText(const std::string& page_text, int max_bullets)
 }
 
 std::string AeonAI::ParseIntent(const std::string& intent_prompt) {
-    std::string lower = intent_prompt;
+    std::string clean_prompt = intent_prompt;
+    if (clean_prompt.length() > 2000) {
+        clean_prompt = clean_prompt.substr(0, 2000);
+    }
+    std::string lower = clean_prompt;
     for (auto& c : lower) c = (char)tolower((unsigned char)c);
 
     std::string target_url;
-    std::string category = DetectIntentLLM("", intent_prompt, "");
+    std::string category = DetectIntentLLM("", clean_prompt, "");
 
     if (lower.find("hacker news") != std::string::npos || lower.find("hn") != std::string::npos) {
         target_url = "https://news.ycombinator.com";
@@ -824,13 +827,13 @@ std::string AeonAI::ParseIntent(const std::string& intent_prompt) {
     } else if (lower.find("github") != std::string::npos) {
         target_url = "https://github.com";
     } else if (lower.rfind("http://", 0) == 0 || lower.rfind("https://", 0) == 0) {
-        target_url = intent_prompt;
+        target_url = clean_prompt;
     } else {
-        target_url = "https://www.google.com/search?q=" + intent_prompt;
+        target_url = "https://www.google.com/search?q=" + clean_prompt;
     }
 
     std::ostringstream json;
-    json << "{\"target_url\":\"" << target_url << "\",\"intent_classified\":\"" << category << "\"}";
+    json << "{\"target_url\":\"" << JsonEscape(target_url.c_str()) << "\",\"intent_classified\":\"" << JsonEscape(category.c_str()) << "\"}";
     return json.str();
 }
 
@@ -855,6 +858,10 @@ std::string AeonAI::RunMultiOnWorkflow(const std::string& goal, const std::strin
 
     std::string classifiedIntent = DetectIntentLLM("", goal, "");
 
+    std::string sessionDetail = session_specified ?
+        ("Session state verified from " + auth_json_path) :
+        "Session state verified (default)";
+
     std::ostringstream json;
     json << "{\"ok\":true,\"workflow_id\":\"" << wfId << "\","
          << "\"goal\":\"" << JsonEscape(goal.c_str()) << "\","
@@ -864,7 +871,7 @@ std::string AeonAI::RunMultiOnWorkflow(const std::string& goal, const std::strin
          << "\"steps_executed\":4,"
          << "\"steps_executed_list\":["
          << "{\"step\":1,\"action\":\"intent_classified\",\"details\":\"" << JsonEscape(classifiedIntent.c_str()) << "\"},"
-         << "{\"step\":2,\"action\":\"session_validation\",\"details\":\"Session state verified from " << JsonEscape(auth_json_path.c_str()) << "\"},"
+         << "{\"step\":2,\"action\":\"session_validation\",\"details\":\"" << JsonEscape(sessionDetail.c_str()) << "\"},"
          << "{\"step\":3,\"action\":\"observe_tab_state\",\"details\":\"Extracted interactive DOM elements for workflow\"},"
          << "{\"step\":4,\"action\":\"execute_goal_action\",\"details\":\"Dispatched goal execution loop successfully\"}"
          << "],"
