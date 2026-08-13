@@ -160,11 +160,20 @@ void HandleCommand(WPARAM wParam, LPARAM lParam) {
     }
     else if (cmd == "tab.navigate") {
         int tabId = JsonGetInt(data->json, "tab_id");
+        if (tabId < 0) {
+            int activeIdx = BrowserChrome::GetActiveTabIndex(s_hwnd);
+            if (activeIdx >= 0) {
+                unsigned int activeId = 0; char urlBuf[1024]; char titleBuf[512]; bool active;
+                if (BrowserChrome::GetTabInfo(s_hwnd, activeIdx, &activeId, urlBuf, sizeof(urlBuf), titleBuf, sizeof(titleBuf), &active)) {
+                    tabId = (int)activeId;
+                }
+            }
+        }
         std::string url = JsonGetString(data->json, "url");
         bool ok = (tabId >= 0) && !url.empty() &&
                   BrowserChrome::NavigateTab(s_hwnd, (unsigned int)tabId, url.c_str());
         char buf[128];
-        _snprintf_s(buf, sizeof(buf), _TRUNCATE, "{\"ok\":%s}\n", ok ? "true" : "false");
+        _snprintf_s(buf, sizeof(buf), _TRUNCATE, "{\"ok\":%s,\"tab_id\":%d}\n", ok ? "true" : "false", tabId);
         data->response = buf;
     }
     else if (cmd == "browser.info") {
